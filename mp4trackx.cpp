@@ -10,9 +10,9 @@ int gcd(int a, int b) { return !b ? a : gcd(b, a % b); }
 
 int lcm(int a, int b) { return b * (a / gcd(a, b)); }
 
-int fps2tsdelta(int num, int denom, int timeScale)
+double fps2tsdelta(int num, int denom, int timeScale)
 {
-    return timeScale / num * denom;
+    return static_cast<double>(timeScale) / num * denom;
 }
 
 MP4TrackX::MP4TrackX(MP4File *pFile, MP4Atom *pTrackAtom)
@@ -27,36 +27,26 @@ MP4TrackX::MP4TrackX(MP4File *pFile, MP4Atom *pTrackAtom)
 
 void MP4TrackX::SetFPS(FPSRange *fpsRanges, size_t numRanges)
 {
-    uint32_t total = 0;
-    FPSRange *fp, *endp = fpsRanges + numRanges;
-    for (fp = fpsRanges; fp != endp; ++fp) {
-	if (fp->numFrames > 0)
-	    total += fp->numFrames;
-	else {
-	    fp->numFrames = GetNumberOfSamples() - total;
-	    total += fp->numFrames;
-	}
-    }
-    if (total != m_sampleTimes.size())
+    uint32_t timeScale = CalcTimeScale(fpsRanges, fpsRanges + numRanges);
+    uint64_t duration = CalcSampleTimes(
+	fpsRanges, fpsRanges + numRanges, timeScale);
+    DoEditTimeCodes(timeScale, duration);
+}
+
+void
+MP4TrackX::SetTimeCodes(double *timeCodes, size_t count, uint32_t timeScale)
+{
+    if (count != GetNumberOfSamples())
 	throw std::runtime_error(
-		"Total number of frames differs from the movie");
+		"timecode entry count differs from the movie");
 
-    int timeScale = 1;
-    for (fp = fpsRanges; fp != endp; ++fp)
-	timeScale = lcm(fp->fps_num, timeScale);
-
-    m_pTimeScaleProperty->SetValue(timeScale);
-
-    uint64_t duration = UpdateStts(fpsRanges, endp, timeScale);
-    m_pMediaDurationProperty->SetValue(0);
-    UpdateDurations(duration);
-    
-    if (m_pCttsCountProperty) {
-	int64_t initialDelay = UpdateCtts();
-	int64_t movieDuration = m_pTrackDurationProperty->GetValue();
-	UpdateElst(movieDuration, initialDelay);
+    uint64_t ioffset = 0;
+    for (size_t i = 0; i < count; ++i) {
+	ioffset = static_cast<uint64_t>(timeCodes[i]);
+	m_sampleTimes[i].dts = ioffset;
+	m_sampleTimes[m_ctsIndex[i]].cts = ioffset;
     }
-    UpdateModificationTimes();
+    DoEditTimeCodes(timeScale, ioffset);
 }
 
 void MP4TrackX::FetchStts()
@@ -99,29 +89,97 @@ void MP4TrackX::FetchCtts()
     }
 }
 
-uint64_t MP4TrackX::UpdateStts(
+uint32_t MP4TrackX::CalcTimeScale(FPSRange *begin, const FPSRange *end)
+{
+    uint32_t total = 0;
+    FPSRange *fp;
+    for (fp = begin; fp != end; ++fp) {
+	if (fp->numFrames > 0)
+	    total += fp->numFrames;
+	else {
+	    fp->numFrames = std::max(
+		static_cast<int>(GetNumberOfSamples() - total), 0);
+	    total += fp->numFrames;
+	}
+    }
+    if (total != m_sampleTimes.size())
+	throw std::runtime_error(
+		"Total number of frames differs from the movie");
+
+    int timeScale = 1;
+    bool exact = true;
+    for (fp = begin; fp != end; ++fp) {
+	int g = gcd(fp->fps_num, fp->fps_denom);
+	fp->fps_num /= g;
+	fp->fps_denom /= g;
+	timeScale = lcm(fp->fps_num, timeScale);
+	if (timeScale == 0 || timeScale % fp->fps_num) {
+	    // LCM overflowed
+	    exact = false;
+	    break;
+	}
+    }
+    if (!exact) timeScale = 1000; // pick default value
+    return timeScale;
+}
+
+uint64_t MP4TrackX::CalcSampleTimes(
 	const FPSRange *begin, const FPSRange *end, uint32_t timeScale)
+{
+    double offset = 0.0;
+    uint32_t frame = 0;
+    for (const FPSRange *fp = begin; fp != end; ++fp) {
+	double delta = fps2tsdelta(fp->fps_num, fp->fps_denom, timeScale);
+	for (uint32_t i = 0; i < fp->numFrames; ++i) {
+	    uint64_t ioffset = static_cast<uint64_t>(offset);
+	    m_sampleTimes[frame].dts = ioffset;
+	    m_sampleTimes[m_ctsIndex[frame]].cts = ioffset;
+	    offset += delta; 
+	    ++frame;
+	}
+    }
+    return static_cast<uint64_t>(offset);
+}
+
+void MP4TrackX::DoEditTimeCodes(uint32_t timeScale, uint64_t duration)
+{
+    m_pTimeScaleProperty->SetValue(timeScale);
+    m_pMediaDurationProperty->SetValue(0);
+    UpdateDurations(duration);
+    
+    UpdateStts();
+    if (m_pCttsCountProperty) {
+	int64_t initialDelay = UpdateCtts();
+	int64_t movieDuration = m_pTrackDurationProperty->GetValue();
+	UpdateElst(movieDuration, initialDelay);
+    }
+    UpdateModificationTimes();
+}
+
+void MP4TrackX::UpdateStts()
 {
     int32_t count = static_cast<int32_t>(m_pSttsCountProperty->GetValue());
     m_pSttsCountProperty->IncrementValue(-1 * count);
     m_pSttsSampleCountProperty->SetCount(0);
     m_pSttsSampleDeltaProperty->SetCount(0);
     
-    uint64_t offset = 0;
-    uint32_t frame = 0;
-    for (const FPSRange *fp = begin; fp != end; ++fp) {
-	int delta = fps2tsdelta(fp->fps_num, fp->fps_denom, timeScale);
-	m_pSttsSampleCountProperty->AddValue(fp->numFrames);
-	m_pSttsSampleDeltaProperty->AddValue(delta);
-	m_pSttsCountProperty->IncrementValue();
-	for (uint32_t i = 0; i < fp->numFrames; ++i) {
-	    m_sampleTimes[frame].dts = offset;
-	    m_sampleTimes[m_ctsIndex[frame]].cts = offset;
-	    offset += delta; 
-	    ++frame;
+    uint64_t prev_dts = 0;
+    int32_t prev_delta = -1;
+    size_t sttsIndex = -1;
+    std::vector<SampleTime>::iterator is;
+    for (is = ++m_sampleTimes.begin(); is != m_sampleTimes.end(); ++is) {
+	int32_t delta = static_cast<int32_t>(is->dts - prev_dts);
+	if (delta != prev_delta) {
+	    ++sttsIndex;
+	    m_pSttsCountProperty->IncrementValue();
+	    m_pSttsSampleCountProperty->AddValue(0);
+	    m_pSttsSampleDeltaProperty->AddValue(delta);
 	}
+	prev_dts = is->dts;
+	prev_delta = delta;
+	m_pSttsSampleCountProperty->IncrementValue(1, sttsIndex);
     }
-    return offset;
+    m_pSttsSampleCountProperty->IncrementValue(1, sttsIndex);
 }
 
 int64_t MP4TrackX::UpdateCtts()

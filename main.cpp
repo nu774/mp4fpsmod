@@ -1,4 +1,6 @@
 #include <cstdio>
+#include <fstream>
+#include <sstream>
 #if defined(_WIN32)
 #include "utf8_codecvt_facet.hpp"
 #include "strcnv.h"
@@ -9,17 +11,72 @@
 #include "mp4filex.h"
 #include "mp4trackx.h"
 
-void
-execute(const char *src, const char *dst, FPSRange *ranges, size_t nranges)
+struct Option {
+    const char *src;
+    const char *dst;
+    FPSRange *ranges;
+    size_t nranges;
+    const char *timecode_file;
+};
+
+void parse_timecode_v2(std::istream &is, std::vector<double> *timeCodes)
+{
+    std::string line;
+    while (std::getline(is, line)) {
+	if (line.size() && line[0] == '#')
+	    continue;
+	double stamp;
+	if (std::sscanf(line.c_str(), "%lf", &stamp) == 1)
+	    timeCodes->push_back(stamp * 1000);
+    }
+}
+
+#ifdef _WIN32
+void load_timecode_v2(const char *fname, std::vector<double> *timeCodes)
+{
+    std::wstring wfname = m2w(fname, utf8_codecvt_facet());
+
+    HANDLE fh = CreateFileW(wfname.c_str(), GENERIC_READ,
+	FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
+    if (fh == INVALID_HANDLE_VALUE)
+	throw std::runtime_error("Can't open timecode file");
+
+    DWORD nread;
+    char buffer[8192];
+    std::stringstream ss;
+    while (ReadFile(fh, buffer, sizeof buffer, &nread, 0) && nread > 0)
+	ss.write(buffer, nread);
+    CloseHandle(fh);
+
+    ss.seekg(0);
+    parse_timecode_v2(ss, timeCodes);
+}
+#else
+void load_timecode_v2(const char *fname, std::vector<double> *timeCodes)
+{
+    std::ifstream ifs(fname);
+    if (!ifs)
+	throw std::runtime_error("Can't open timecode file");
+    parse_timecode_v2(ifs, timeCodes);
+}
+#endif
+
+void execute(Option &option)
 {
     try {
-	MP4FileX file(0);
-	file.Read(src, 0);
+	MP4FileX file(2);
+	file.Read(option.src, 0);
 	MP4TrackId trackId = file.FindTrackId(0, MP4_VIDEO_TRACK_TYPE);
 	mp4v2::impl::MP4Atom *trackAtom = file.FindTrackAtom(trackId, 0);
 	MP4TrackX track(&file, trackAtom);
-	track.SetFPS(ranges, nranges);
-	file.SaveTo(dst);
+	if (option.nranges)
+	    track.SetFPS(option.ranges, option.nranges);
+	else {
+	    std::vector<double> timeCodes;
+	    load_timecode_v2(option.timecode_file, &timeCodes);
+	    track.SetTimeCodes(&timeCodes[0], timeCodes.size(), 1000 * 1000);
+	}
+	file.SaveTo(option.dst);
     } catch (mp4v2::impl::MP4Error *e) {
 	handle_mp4error(e);
     }
@@ -28,7 +85,8 @@ execute(const char *src, const char *dst, FPSRange *ranges, size_t nranges)
 void usage()
 {
     std::fputs(
-	"usage: mp4fpsmod [-r NFRAMES:FPS ] -o DSTFILENAME FILE\n"
+	"usage: mp4fpsmod [-r NFRAMES:FPS ] [-t TIMECODE_V2_FILE ] -o DEST SRC\n"
+	"  -t: Use this option to specify timecodes using timecode v2 file.\n"
 	"  -r: Use this option to specify fps and the range which fps is applied to.\n"
 	"      You can specify -r option more than two times to produce VFR movie.\n"
 	"  NFRAMES: integer, number of frames\n"
@@ -43,22 +101,35 @@ int main1(int argc, char **argv)
 	int ch;
 	std::vector<FPSRange> spec;
 	const char *dstname = 0;
-	while ((ch = getopt(argc, argv, "r:o:")) != EOF) {
+	const char *timecode_file = 0;
+	while ((ch = getopt(argc, argv, "r:t:o:")) != EOF) {
 	    if (ch == 'r') {
 		int nframes, num, denom = 1;
 		if (sscanf(optarg, "%d:%d/%d", &nframes, &num, &denom) < 2)
 		    usage();
 		FPSRange range = { nframes, num, denom };
 		spec.push_back(range);
+	    } else if (ch == 't') {
+		timecode_file = optarg;
 	    } else if (ch == 'o') {
 		dstname = optarg;
 	    }
 	}
 	argc -= optind;
 	argv += optind;
-	if (argc == 0 || spec.size() == 0 || dstname == 0)
+	if (argc == 0 || dstname == 0)
 	    usage();
-	execute(argv[0], dstname, &spec[0], spec.size());
+	if (spec.size() == 0 && timecode_file == 0)
+	    usage();
+
+	Option option;
+	option.src = argv[0];
+	option.dst = dstname;
+	option.ranges = spec.size() ? &spec[0] : 0;
+	option.nranges = spec.size();
+	option.timecode_file = timecode_file;
+
+	execute(option);
 	return 0;
     } catch (const std::exception &e) {
 	std::fprintf(stderr, "%s\n", e.what());

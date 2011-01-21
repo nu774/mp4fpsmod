@@ -18,12 +18,17 @@ Read foo.mp4, change fps of first 300 frames to 30000/1001, next 600 frames to 2
 
     mp4fpsmod -r 300:30000/1001 -r 600:24000/1001 -r 0:30000/1001 -o bar.mp4 foo.mp4
 
+To read timecodes from timecode_v2 file::
+
+    mp4fpsmod -t timecode.txt foo.mp4 -o bar.mp4
+
 Usage
 -----
 
 ::
 
   -r nframes:fps          use this option to specify fps.
+  -t timecode_v2_file     use this option to feed timecode v2 file.
   -o file                 output filename.
 
 "nframes" is the number of frames, which "fps" is applied to. 0 as nframes means "rest of the movie".

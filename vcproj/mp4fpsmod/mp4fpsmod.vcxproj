@@ -88,6 +88,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\getopt.h" />
+    <ClInclude Include="..\..\mp4filex.h" />
     <ClInclude Include="..\..\mp4trackx.h" />
     <ClInclude Include="..\..\mp4v2wrapper.h" />
     <ClInclude Include="..\..\strcnv.h" />

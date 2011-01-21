@@ -28,6 +28,7 @@ class MP4TrackX: public mp4v2::impl::MP4Track {
 public:
     MP4TrackX(mp4v2::impl::MP4File *pFile, mp4v2::impl::MP4Atom *pTrackAtom);
     void SetFPS(FPSRange *fpsRanges, size_t numRanges);
+    void SetTimeCodes(double *timeCodes, size_t count, uint32_t timeScale);
 private:
     bool CompareByCTS(uint32_t a, uint32_t b)
     {
@@ -35,8 +36,11 @@ private:
     }
     void FetchStts();
     void FetchCtts();
-    uint64_t UpdateStts(
+    uint32_t CalcTimeScale(FPSRange *begin, const FPSRange *end);
+    uint64_t CalcSampleTimes(
 	    const FPSRange *begin, const FPSRange *end, uint32_t timeScale);
+    void DoEditTimeCodes(uint32_t timeScale, uint64_t duration);
+    void UpdateStts();
     int64_t UpdateCtts();
     void UpdateElst(int64_t duration, int64_t mediaTime);
 };
