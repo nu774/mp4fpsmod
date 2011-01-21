@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <fstream>
 #include <sstream>
+#include <numeric>
 #if defined(_WIN32)
 #include "utf8_codecvt_facet.hpp"
 #include "strcnv.h"
@@ -17,24 +18,100 @@ struct Option {
     FPSRange *ranges;
     size_t nranges;
     const char *timecode_file;
+    bool optimize_timecode;
+    std::vector<double> timecodes;
+    uint32_t time_scale;
 };
 
-void parse_timecode_v2(std::istream &is, std::vector<double> *timeCodes)
+/*
+ * divide sequence like 1, 2, 1, 1, 2, 3, 2, 3, 3, 2, 1, 1, 2
+ * into 
+ * 1, 2, 1, 1, 2
+ * and
+ * 3, 2, 3, 3, 2
+ * and
+ * 1, 1, 2
+ *
+ * each group can hold continuous numbers within [n, n + 1] for some n.
+ */
+template <typename T, typename InputIterator>
+void groupby_adjacent(InputIterator begin, InputIterator end,
+	std::vector<std::vector<T> > *result)
+{
+    std::vector<std::vector<T> > groups;
+    T low = 1, high = 0;
+    for (; begin != end; ++begin) {
+	if (*begin < low || *begin > high) {
+	    groups.push_back(std::vector<T>());
+	    low = *begin - 1;
+	    high = *begin + 1;
+	} else {
+	    T prev = groups.back().back();
+	    if (prev != *begin && high - low == 2) {
+		low = std::min(prev, *begin);
+		high = std::max(prev, *begin);
+	    }
+	}
+	groups.back().push_back(*begin);
+    }
+    result->swap(groups);
+}
+
+void normalize_timecode(Option &option)
+{
+    std::vector<double> &tc = option.timecodes;
+    std::vector<int> deltas;
+    double prev = tc[0];
+    for (std::vector<double>::const_iterator ii = ++tc.begin();
+	    ii != tc.end(); ++ii) {
+	deltas.push_back(static_cast<int>(*ii - prev));
+	prev = *ii;
+    }
+
+    std::vector<std::vector<int> > groups;
+    groupby_adjacent(deltas.begin(), deltas.end(), &groups);
+
+    std::vector<double> averages;
+    for (std::vector<std::vector<int> >::const_iterator kk = groups.begin();
+	    kk != groups.end(); ++kk) {
+	uint64_t sum = std::accumulate(kk->begin(), kk->end(), 0ULL);
+	double average = static_cast<double>(sum) / kk->size();
+	averages.push_back(average);
+    }
+    option.time_scale *= 1000;
+    tc.clear();
+    tc.push_back(0.0);
+    for (size_t i = 0; i < groups.size(); ++i) {
+	for (size_t j = 0; j < groups[i].size(); ++j)
+	    tc.push_back(tc.back() + averages[i] * 1000);
+    }
+}
+
+void parse_timecode_v2(Option &option, std::istream &is)
 {
     std::string line;
+    bool is_float = false;
     while (std::getline(is, line)) {
 	if (line.size() && line[0] == '#')
 	    continue;
 	double stamp;
+	if (strchr(line.c_str(), '.')) is_float = true;
 	if (std::sscanf(line.c_str(), "%lf", &stamp) == 1)
-	    timeCodes->push_back(stamp * 1000);
+	    option.timecodes.push_back(stamp);
+    }
+    if (option.optimize_timecode && !is_float && option.timecodes.size())
+	normalize_timecode(option);
+    else if (is_float) {
+	option.time_scale *= 1000;
+	for (size_t i = 0; i < option.timecodes.size(); ++i)
+	    option.timecodes[i] = option.timecodes[i] * 1000;
     }
 }
 
 #ifdef _WIN32
-void load_timecode_v2(const char *fname, std::vector<double> *timeCodes)
+void load_timecode_v2(Option &option)
 {
-    std::wstring wfname = m2w(fname, utf8_codecvt_facet());
+    std::wstring wfname = m2w(option.timecode_file, utf8_codecvt_facet());
 
     HANDLE fh = CreateFileW(wfname.c_str(), GENERIC_READ,
 	FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
@@ -49,15 +126,15 @@ void load_timecode_v2(const char *fname, std::vector<double> *timeCodes)
     CloseHandle(fh);
 
     ss.seekg(0);
-    parse_timecode_v2(ss, timeCodes);
+    parse_timecode_v2(option, ss);
 }
 #else
-void load_timecode_v2(const char *fname, std::vector<double> *timeCodes)
+void load_timecode_v2(Option &option)
 {
-    std::ifstream ifs(fname);
+    std::ifstream ifs(option.timecode_file);
     if (!ifs)
 	throw std::runtime_error("Can't open timecode file");
-    parse_timecode_v2(ifs, timeCodes);
+    parse_timecode_v2(option, ifs);
 }
 #endif
 
@@ -72,9 +149,10 @@ void execute(Option &option)
 	if (option.nranges)
 	    track.SetFPS(option.ranges, option.nranges);
 	else {
-	    std::vector<double> timeCodes;
-	    load_timecode_v2(option.timecode_file, &timeCodes);
-	    track.SetTimeCodes(&timeCodes[0], timeCodes.size(), 1000 * 1000);
+	    load_timecode_v2(option);
+	    track.SetTimeCodes(&option.timecodes[0],
+		    option.timecodes.size(),
+		    option.time_scale);
 	}
 	file.SaveTo(option.dst);
     } catch (mp4v2::impl::MP4Error *e) {
@@ -85,12 +163,13 @@ void execute(Option &option)
 void usage()
 {
     std::fputs(
-	"usage: mp4fpsmod [-r NFRAMES:FPS ] [-t TIMECODE_V2_FILE ] -o DEST SRC\n"
-	"  -t: Use this option to specify timecodes using timecode v2 file.\n"
-	"  -r: Use this option to specify fps and the range which fps is applied to.\n"
-	"      You can specify -r option more than two times to produce VFR movie.\n"
-	"  NFRAMES: integer, number of frames\n"
-	"  FPS: integer, or fraction value. You can specity FPS like 25 or 30000/1001\n"
+"usage: mp4fpsmod [-r NFRAMES:FPS ] [-t TIMECODE_V2_FILE ] -o DEST SRC\n"
+"  -t: Use this option to specify timecodes using timecode v2 file.\n"
+"  -x: Use this option to optimize timecode entry in timecode file.\n"
+"  -r: Use this option to specify fps and the range which fps is applied to.\n"
+"      You can specify -r option more than two times to produce VFR movie.\n"
+"  NFRAMES: integer, number of frames\n"
+"  FPS: integer, or fraction value. You can specity FPS like 25 or 30000/1001\n"
 	,stderr);
     std::exit(1);
 }
@@ -102,7 +181,9 @@ int main1(int argc, char **argv)
 	std::vector<FPSRange> spec;
 	const char *dstname = 0;
 	const char *timecode_file = 0;
-	while ((ch = getopt(argc, argv, "r:t:o:")) != EOF) {
+	bool optimize_timecode = false;
+
+	while ((ch = getopt(argc, argv, "r:t:o:x")) != EOF) {
 	    if (ch == 'r') {
 		int nframes, num, denom = 1;
 		if (sscanf(optarg, "%d:%d/%d", &nframes, &num, &denom) < 2)
@@ -113,6 +194,8 @@ int main1(int argc, char **argv)
 		timecode_file = optarg;
 	    } else if (ch == 'o') {
 		dstname = optarg;
+	    } else if (ch == 'x') {
+		optimize_timecode = true;
 	    }
 	}
 	argc -= optind;
@@ -128,6 +211,8 @@ int main1(int argc, char **argv)
 	option.ranges = spec.size() ? &spec[0] : 0;
 	option.nranges = spec.size();
 	option.timecode_file = timecode_file;
+	option.optimize_timecode = optimize_timecode;
+	option.time_scale = 1000;
 
 	execute(option);
 	return 0;
