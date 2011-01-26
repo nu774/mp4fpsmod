@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <cmath>
 #include <fstream>
 #include <sstream>
 #include <numeric>
@@ -74,9 +75,9 @@ bool convertToExactRanges(Option &opt)
 	prev = *dp;
     }
     ++ranges.back().numFrames;
-    fprintf(stderr, "converted to exact fps ranges\n");
+    std::fprintf(stderr, "converted to exact fps ranges\n");
     for (size_t i = 0; i < ranges.size(); ++i) {
-	fprintf(stderr, "%d frames: fps %d/%d\n",
+	std::fprintf(stderr, "%d frames: fps %d/%d\n",
 	    ranges[i].numFrames, ranges[i].fps_num, ranges[i].fps_denom);
     }
     std::putc('\n', stderr);
@@ -143,12 +144,11 @@ void normalizeTimecode(Option &opt)
     }
     std::putc('\n', stderr);
 
-    opt.timeScale *= 1000;
     tc.clear();
     tc.push_back(0.0);
     for (size_t i = 0; i < groups.size(); ++i) {
 	for (size_t j = 0; j < groups[i].size(); ++j)
-	    tc.push_back(tc.back() + averages[i] * 1000);
+	    tc.push_back(tc.back() + averages[i]);
     }
 }
 
@@ -168,10 +168,17 @@ void parseTimecodeV2(Option &opt, std::istream &is)
 	throw std::runtime_error("No entry in the timecode file");
     if (opt.optimizeTimecode && !is_float)
 	normalizeTimecode(opt);
-    else if (is_float) {
-	opt.timeScale *= 1000;
-	for (size_t i = 0; i < opt.timecodes.size(); ++i)
-	    opt.timecodes[i] = opt.timecodes[i] * 1000;
+    if ((opt.optimizeTimecode || is_float) && opt.timecodes.size() > 1) {
+	size_t n = opt.timecodes.size();
+	double delta = opt.timecodes[n-1] - opt.timecodes[n-2];
+	double duration = opt.timecodes[n-1] + delta;
+	int scale, scaleMax = static_cast<int>(0x7fffffff / duration);
+	for (scale = 10; scale < scaleMax; scale *= 10)
+	    ;
+	scale /= 10;
+	for (size_t i = 0; i < n; ++i)
+	   opt.timecodes[i] *= scale;
+	opt.timeScale *= scale;
     }
 }
 
@@ -208,7 +215,7 @@ void loadTimecodeV2(Option &option)
 void execute(Option &opt)
 {
     try {
-	MP4FileX file(2);
+	MP4FileX file(0);
 	file.Read(opt.src, 0);
 	MP4TrackId trackId = file.FindTrackId(0, MP4_VIDEO_TRACK_TYPE);
 	mp4v2::impl::MP4Atom *trackAtom = file.FindTrackAtom(trackId, 0);
@@ -253,7 +260,7 @@ int main1(int argc, char **argv)
 	while ((ch = getopt(argc, argv, "r:t:o:x")) != EOF) {
 	    if (ch == 'r') {
 		int nframes, num, denom = 1;
-		if (sscanf(optarg, "%d:%d/%d", &nframes, &num, &denom) < 2)
+		if (std::sscanf(optarg, "%d:%d/%d", &nframes, &num, &denom) < 2)
 		    usage();
 		FPSRange range = { nframes, num, denom };
 		option.ranges.push_back(range);

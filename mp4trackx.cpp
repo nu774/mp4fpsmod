@@ -30,6 +30,14 @@ void MP4TrackX::SetFPS(FPSRange *fpsRanges, size_t numRanges)
     uint32_t timeScale = CalcTimeScale(fpsRanges, fpsRanges + numRanges);
     uint64_t duration = CalcSampleTimes(
 	fpsRanges, fpsRanges + numRanges, timeScale);
+    if (duration > 0x7fffffff) {
+	double t = static_cast<double>(timeScale) * 0x7fffffff / duration;
+	for (timeScale = 100; timeScale < t; timeScale *= 10)
+	    ;
+	timeScale /= 10;
+	duration = CalcSampleTimes(fpsRanges, fpsRanges + numRanges,
+		timeScale);
+    }
     DoEditTimeCodes(timeScale, duration);
 }
 
@@ -41,11 +49,14 @@ MP4TrackX::SetTimeCodes(double *timeCodes, size_t count, uint32_t timeScale)
 		"timecode entry count differs from the movie");
 
     uint64_t ioffset = 0;
+    int64_t delta = 0;
     for (size_t i = 0; i < count; ++i) {
-	ioffset = static_cast<uint64_t>(timeCodes[i]);
+	delta = static_cast<uint64_t>(timeCodes[i]) - ioffset;
+	ioffset += delta;
 	m_sampleTimes[i].dts = ioffset;
 	m_sampleTimes[m_ctsIndex[i]].cts = ioffset;
     }
+    ioffset += delta;
     DoEditTimeCodes(timeScale, ioffset);
 }
 
