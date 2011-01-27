@@ -1,0 +1,8 @@
+How to build in Linux:
+
+$ pushd mp4v2
+$ autoreconf --install
+$ ./configure --enable-shared=no --disable-util
+$ make
+$ popd
+$ make
