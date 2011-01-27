@@ -75,7 +75,7 @@ bool convertToExactRanges(Option &opt)
 	prev = *dp;
     }
     ++ranges.back().numFrames;
-    std::fprintf(stderr, "converted to exact fps ranges\n");
+    std::fprintf(stderr, "\nConverted to exact fps ranges\n");
     for (size_t i = 0; i < ranges.size(); ++i) {
 	std::fprintf(stderr, "%d frames: fps %d/%d\n",
 	    ranges[i].numFrames, ranges[i].fps_num, ranges[i].fps_denom);
@@ -136,7 +136,7 @@ void normalizeTimecode(Option &opt)
 	double average = static_cast<double>(sum) / kk->size();
 	averages.push_back(average);
     }
-    std::fprintf(stderr, "divided into %d group%s\n",
+    std::fprintf(stderr, "\nDivided into %d group%s\n",
 	    groups.size(), (groups.size() == 1) ? "" : "s");
     for (size_t i = 0; i < groups.size(); ++i) {
 	std::fprintf(stderr, "%d frames: time delta %g\n",
@@ -216,7 +216,9 @@ void execute(Option &opt)
 {
     try {
 	MP4FileX file(0);
+	std::fprintf(stderr, "Reading MP4 stream...\n");
 	file.Read(opt.src, 0);
+	std::fprintf(stderr, "Done reading\n");
 	MP4TrackId trackId = file.FindTrackId(0, MP4_VIDEO_TRACK_TYPE);
 	mp4v2::impl::MP4Atom *trackAtom = file.FindTrackAtom(trackId, 0);
 	MP4TrackX track(&file, trackAtom);
@@ -231,7 +233,9 @@ void execute(Option &opt)
 			opt.timecodes.size(),
 			opt.timeScale);
 	}
+	std::fprintf(stderr, "Saving MP4 stream...\n");
 	file.SaveTo(opt.dst);
+	std::fprintf(stderr, "Operation completed with no problem\n");
     } catch (mp4v2::impl::MP4Error *e) {
 	handle_mp4error(e);
     }
@@ -254,6 +258,8 @@ void usage()
 int main1(int argc, char **argv)
 {
     try {
+	std::setbuf(stderr, 0);
+
 	Option option;
 	int ch;
 

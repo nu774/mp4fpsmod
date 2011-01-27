@@ -5,6 +5,8 @@
 using mp4v2::impl::MP4File;
 using mp4v2::impl::MP4Track;
 using mp4v2::impl::MP4Atom;
+using mp4v2::impl::MP4Property;
+using mp4v2::impl::MP4IntegerProperty;
 
 int gcd(int a, int b) { return !b ? a : gcd(b, a % b); }
 
@@ -157,6 +159,19 @@ void MP4TrackX::DoEditTimeCodes(uint32_t timeScale, uint64_t duration)
     m_pTimeScaleProperty->SetValue(timeScale);
     m_pMediaDurationProperty->SetValue(0);
     UpdateDurations(duration);
+
+    uint32_t ntracks = GetFile()->GetNumberOfTracks();
+    int64_t max_duration = 0;
+    for (uint32_t i = 0; i < ntracks; ++i) {
+	MP4Track *track = GetFile()->GetTrack(GetFile()->FindTrackId(i));
+	MP4Atom *trackAtom = track->GetTrakAtom();
+	MP4Property *pProp;
+	if (trackAtom->FindProperty("trak.tkhd.duration", &pProp)) {
+	    int64_t v = dynamic_cast<MP4IntegerProperty*>(pProp)->GetValue();
+	    max_duration = std::max(max_duration, v);
+	}
+    }
+    GetFile()->SetDuration(max_duration);
     
     UpdateStts();
     if (m_pCttsCountProperty) {
