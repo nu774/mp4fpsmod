@@ -4,6 +4,7 @@
 #include <sstream>
 #include <numeric>
 #if defined(_WIN32)
+#include <Windows.h>
 #include "utf8_codecvt_facet.hpp"
 #include "strcnv.h"
 #endif
