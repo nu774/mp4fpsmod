@@ -6,3 +6,4 @@ $ ./configure --enable-shared=no --disable-util
 $ make
 $ popd
 $ make
+$ strip mp4fpsmod

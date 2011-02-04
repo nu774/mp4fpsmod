@@ -8,7 +8,6 @@ all: mp4fpsmod
 
 mp4fpsmod: $(OBJS) $(LIBS)
 	$(CXX) -o $@ $(OBJS) $(LIBS)
-	strip $@
 
 clean:
 	rm -f *.o
