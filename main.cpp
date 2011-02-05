@@ -4,12 +4,14 @@
 #include <sstream>
 #include <numeric>
 #if defined(_WIN32)
-#include <Windows.h>
+#include <windows.h>
 #include "utf8_codecvt_facet.hpp"
 #include "strcnv.h"
 #endif
 #ifdef _MSC_VER
 #include "getopt.h"
+#else
+#include <unistd.h>
 #endif
 #include "mp4filex.h"
 #include "mp4trackx.h"
