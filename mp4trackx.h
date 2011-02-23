@@ -26,7 +26,7 @@ class MP4TrackX: public mp4v2::impl::MP4Track {
     std::vector<SampleTime> m_sampleTimes;
     std::vector<uint32_t> m_ctsIndex;
 public:
-    MP4TrackX(mp4v2::impl::MP4File *pFile, mp4v2::impl::MP4Atom *pTrackAtom);
+    MP4TrackX(mp4v2::impl::MP4File &pFile, mp4v2::impl::MP4Atom &pTrackAtom);
     void SetFPS(FPSRange *fpsRanges, size_t numRanges);
     void SetTimeCodes(double *timeCodes, size_t count, uint32_t timeScale);
 private:

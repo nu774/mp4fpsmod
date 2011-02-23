@@ -218,13 +218,14 @@ void loadTimecodeV2(Option &option)
 void execute(Option &opt)
 {
     try {
-	MP4FileX file(0);
+	mp4v2::impl::log.setVerbosity(MP4_LOG_NONE);
+	MP4FileX file;
 	std::fprintf(stderr, "Reading MP4 stream...\n");
 	file.Read(opt.src, 0);
 	std::fprintf(stderr, "Done reading\n");
 	MP4TrackId trackId = file.FindTrackId(0, MP4_VIDEO_TRACK_TYPE);
 	mp4v2::impl::MP4Atom *trackAtom = file.FindTrackAtom(trackId, 0);
-	MP4TrackX track(&file, trackAtom);
+	MP4TrackX track(file, *trackAtom);
 	if (opt.ranges.size())
 	    track.SetFPS(&opt.ranges[0], opt.ranges.size());
 	else {
@@ -239,7 +240,7 @@ void execute(Option &opt)
 	std::fprintf(stderr, "Saving MP4 stream...\n");
 	file.SaveTo(opt.dst);
 	std::fprintf(stderr, "Operation completed with no problem\n");
-    } catch (mp4v2::impl::MP4Error *e) {
+    } catch (mp4v2::impl::Exception *e) {
 	handle_mp4error(e);
     }
 }

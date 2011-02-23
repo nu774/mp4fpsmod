@@ -17,7 +17,7 @@ double fps2tsdelta(int num, int denom, int timeScale)
     return static_cast<double>(timeScale) / num * denom;
 }
 
-MP4TrackX::MP4TrackX(MP4File *pFile, MP4Atom *pTrackAtom)
+MP4TrackX::MP4TrackX(MP4File &pFile, MP4Atom &pTrackAtom)
     : MP4Track(pFile, pTrackAtom)
 {
     FetchStts();
@@ -160,18 +160,18 @@ void MP4TrackX::DoEditTimeCodes(uint32_t timeScale, uint64_t duration)
     m_pMediaDurationProperty->SetValue(0);
     UpdateDurations(duration);
 
-    uint32_t ntracks = GetFile()->GetNumberOfTracks();
+    uint32_t ntracks = GetFile().GetNumberOfTracks();
     int64_t max_duration = 0;
     for (uint32_t i = 0; i < ntracks; ++i) {
-	MP4Track *track = GetFile()->GetTrack(GetFile()->FindTrackId(i));
-	MP4Atom *trackAtom = track->GetTrakAtom();
+	MP4Track *track = GetFile().GetTrack(GetFile().FindTrackId(i));
+	MP4Atom &trackAtom = track->GetTrakAtom();
 	MP4Property *pProp;
-	if (trackAtom->FindProperty("trak.tkhd.duration", &pProp)) {
+	if (trackAtom.FindProperty("trak.tkhd.duration", &pProp)) {
 	    int64_t v = dynamic_cast<MP4IntegerProperty*>(pProp)->GetValue();
 	    max_duration = std::max(max_duration, v);
 	}
     }
-    GetFile()->SetDuration(max_duration);
+    GetFile().SetDuration(max_duration);
     
     UpdateStts();
     if (m_pCttsCountProperty) {

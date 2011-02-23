@@ -5,9 +5,9 @@
 #include <stdexcept>
 #include "impl.h"
 
-std::string format_mp4error(const mp4v2::impl::MP4Error &e);
+std::string format_mp4error(const mp4v2::impl::Exception &e);
 
-inline void handle_mp4error(mp4v2::impl::MP4Error *e)
+inline void handle_mp4error(mp4v2::impl::Exception *e)
 {
     std::runtime_error re(format_mp4error(*e));
     delete e;

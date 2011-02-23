@@ -5,7 +5,7 @@
 
 class MP4FileX: public mp4v2::impl::MP4File {
 public:
-    MP4FileX(uint32_t verbosity=0): mp4v2::impl::MP4File(verbosity) {}
+    MP4FileX() {}
     ~MP4FileX() { if (m_file) Close(); }
     void SaveTo(const char *fileName);
 };
