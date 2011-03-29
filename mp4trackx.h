@@ -25,8 +25,15 @@ class MP4TrackX: public mp4v2::impl::MP4Track {
 
     std::vector<SampleTime> m_sampleTimes;
     std::vector<uint32_t> m_ctsIndex;
+    uint32_t m_timeScale;
+    uint64_t m_mediaDuration;
+    bool m_compressDTS;
 public:
     MP4TrackX(mp4v2::impl::MP4File &pFile, mp4v2::impl::MP4Atom &pTrackAtom);
+    void EnableDTSCompression(bool enable)
+    {
+	m_compressDTS = enable;
+    }
     void SetFPS(FPSRange *fpsRanges, size_t numRanges);
     void SetTimeCodes(double *timeCodes, size_t count, uint32_t timeScale);
 private:
@@ -39,8 +46,10 @@ private:
     uint32_t CalcTimeScale(FPSRange *begin, const FPSRange *end);
     uint64_t CalcSampleTimes(
 	    const FPSRange *begin, const FPSRange *end, uint32_t timeScale);
-    int64_t CalcCTSOffset();
-    void DoEditTimeCodes(uint32_t timeScale, uint64_t duration);
+    int64_t CalcInitialDelay();
+    int64_t CompressDTS(int64_t initialDelay);
+    void CalcCTSOffset(int64_t initialDelay);
+    void DoEditTimeCodes();
     void UpdateStts();
     void UpdateCtts();
     void UpdateElst(int64_t duration, int64_t mediaTime);

@@ -18,7 +18,7 @@ double fps2tsdelta(int num, int denom, int timeScale)
 }
 
 MP4TrackX::MP4TrackX(MP4File &pFile, MP4Atom &pTrackAtom)
-    : MP4Track(pFile, pTrackAtom)
+    : MP4Track(pFile, pTrackAtom), m_compressDTS(false)
 {
     FetchStts();
     FetchCtts();
@@ -40,7 +40,9 @@ void MP4TrackX::SetFPS(FPSRange *fpsRanges, size_t numRanges)
 	duration = CalcSampleTimes(fpsRanges, fpsRanges + numRanges,
 		timeScale);
     }
-    DoEditTimeCodes(timeScale, duration);
+    m_timeScale = timeScale;
+    m_mediaDuration = duration;
+    DoEditTimeCodes();
 }
 
 void
@@ -59,7 +61,9 @@ MP4TrackX::SetTimeCodes(double *timeCodes, size_t count, uint32_t timeScale)
 	m_sampleTimes[m_ctsIndex[i]].cts = ioffset;
     }
     ioffset += delta;
-    DoEditTimeCodes(timeScale, ioffset);
+    m_timeScale = timeScale;
+    m_mediaDuration = ioffset;
+    DoEditTimeCodes();
 }
 
 void MP4TrackX::FetchStts()
@@ -121,10 +125,13 @@ uint32_t MP4TrackX::CalcTimeScale(FPSRange *begin, const FPSRange *end)
 
     int timeScale = 1;
     bool exact = true;
+    int min_denom = INT_MAX;
     for (fp = begin; fp != end; ++fp) {
 	int g = gcd(fp->fps_num, fp->fps_denom);
 	fp->fps_num /= g;
 	fp->fps_denom /= g;
+	if (fp->fps_denom < min_denom)
+	    min_denom = fp->fps_denom;
 	timeScale = lcm(fp->fps_num, timeScale);
 	if (timeScale == 0 || timeScale % fp->fps_num) {
 	    // LCM overflowed
@@ -133,6 +140,7 @@ uint32_t MP4TrackX::CalcTimeScale(FPSRange *begin, const FPSRange *end)
 	}
     }
     if (!exact) timeScale = 1000; // pick default value
+    else if (min_denom < 100) timeScale *= 100.0 / min_denom;
     return timeScale;
 }
 
@@ -154,7 +162,7 @@ uint64_t MP4TrackX::CalcSampleTimes(
     return static_cast<uint64_t>(offset);
 }
 
-int64_t MP4TrackX::CalcCTSOffset()
+int64_t MP4TrackX::CalcInitialDelay()
 {
     int64_t maxdiff = 0;
     std::vector<SampleTime>::iterator is;
@@ -162,19 +170,47 @@ int64_t MP4TrackX::CalcCTSOffset()
 	int64_t diff = is->dts - is->cts;
 	if (diff > maxdiff) maxdiff = diff;
     }
-    for (is = m_sampleTimes.begin(); is != m_sampleTimes.end(); ++is) {
-	is->cts += maxdiff;
-	is->ctsOffset = is->cts - is->dts;
-    }
     return maxdiff;
 }
 
-void MP4TrackX::DoEditTimeCodes(uint32_t timeScale, uint64_t duration)
+int64_t MP4TrackX::CompressDTS(int64_t initialDelay)
 {
-    int64_t initialDelay = CalcCTSOffset();
-    m_pTimeScaleProperty->SetValue(timeScale);
+    size_t n = 0;
+    double scale = static_cast<double>(m_sampleTimes[1].dts) / initialDelay;
+    int64_t prev_dts = 0;
+    for (n = 1; n < m_sampleTimes.size(); ++n) {
+	int64_t dts = m_sampleTimes[n].dts;
+	if (dts - initialDelay > prev_dts)
+	    break;
+	int64_t new_dts = dts * scale;
+	if (new_dts == prev_dts)
+	    ++new_dts;
+	m_sampleTimes[n].dts = prev_dts = new_dts;
+    }
+    for (size_t i = n; i < m_sampleTimes.size(); ++i) {
+	m_sampleTimes[i].dts -= initialDelay;
+    }
+    return CalcInitialDelay();
+}
+
+void MP4TrackX::CalcCTSOffset(int64_t initialDelay)
+{
+    std::vector<SampleTime>::iterator is;
+    for (is = m_sampleTimes.begin(); is != m_sampleTimes.end(); ++is) {
+	is->cts += initialDelay;
+	is->ctsOffset = is->cts - is->dts;
+    }
+}
+
+void MP4TrackX::DoEditTimeCodes()
+{
+    int64_t initialDelay = CalcInitialDelay();
+    if (m_compressDTS)
+	initialDelay = CompressDTS(initialDelay);
+    CalcCTSOffset(initialDelay);
+    m_pTimeScaleProperty->SetValue(m_timeScale);
     m_pMediaDurationProperty->SetValue(0);
-    UpdateDurations(duration);
+    UpdateDurations(m_mediaDuration);
 
     uint32_t ntracks = GetFile().GetNumberOfTracks();
     int64_t max_duration = 0;

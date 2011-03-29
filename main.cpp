@@ -18,16 +18,18 @@
 
 struct Option {
     const char *src, *dst, *timecodeFile;
-    std::vector<FPSRange> ranges;
-    std::vector<double> timecodes;
+    bool compressDTS;
     bool optimizeTimecode;
     uint32_t timeScale;
+    std::vector<FPSRange> ranges;
+    std::vector<double> timecodes;
 
     Option()
     {
 	src = 0;
 	dst = 0;
 	timecodeFile = 0;
+	compressDTS = false;
 	optimizeTimecode = false;
 	timeScale = 1000;
     }
@@ -226,6 +228,8 @@ void execute(Option &opt)
 	MP4TrackId trackId = file.FindTrackId(0, MP4_VIDEO_TRACK_TYPE);
 	mp4v2::impl::MP4Atom *trackAtom = file.FindTrackAtom(trackId, 0);
 	MP4TrackX track(file, *trackAtom);
+	if (opt.compressDTS)
+	    track.EnableDTSCompression(true);
 	if (opt.ranges.size())
 	    track.SetFPS(&opt.ranges[0], opt.ranges.size());
 	else {
@@ -248,11 +252,12 @@ void execute(Option &opt)
 void usage()
 {
     std::fputs(
-"usage: mp4fpsmod [-r NFRAMES:FPS ] [-t TIMECODE_V2_FILE ] [-x] -o DEST SRC\n"
-"  -t: Use this option to specify timecodes using timecode v2 file.\n"
-"  -x: Use this option to optimize timecode entry in timecode file.\n"
-"  -r: Use this option to specify fps and the range which fps is applied to.\n"
+"usage: mp4fpsmod [-r NFRAMES:FPS ] [-t TIMECODE_V2_FILE ] [-x] [-c] -o DEST SRC\n"
+"  -t: Give timecodes with timecode-v2 file.\n"
+"  -x: Optimize timecode entry in timecode file.\n"
+"  -r: Specify fps and range which fps is applied to.\n"
 "      You can specify -r option more than two times to produce VFR movie.\n"
+"  -c: Enable DTS compression.\n"
 "  NFRAMES: integer, number of frames\n"
 "  FPS: integer, or fraction value. You can specity FPS like 25 or 30000/1001\n"
 	,stderr);
@@ -267,7 +272,7 @@ int main1(int argc, char **argv)
 	Option option;
 	int ch;
 
-	while ((ch = getopt(argc, argv, "r:t:o:x")) != EOF) {
+	while ((ch = getopt(argc, argv, "r:t:o:xc")) != EOF) {
 	    if (ch == 'r') {
 		int nframes, num, denom = 1;
 		if (std::sscanf(optarg, "%d:%d/%d", &nframes, &num, &denom) < 2)
@@ -280,6 +285,8 @@ int main1(int argc, char **argv)
 		option.dst = optarg;
 	    } else if (ch == 'x') {
 		option.optimizeTimecode = true;
+	    } else if (ch == 'c') {
+		option.compressDTS = true;
 	    }
 	}
 	argc -= optind;
