@@ -1,7 +1,7 @@
 How to build in Linux:
 
 $ pushd mp4v2
-$ autoreconf --install
+$ ./make_configure
 $ ./configure --enable-shared=no --disable-util
 $ make
 $ popd
