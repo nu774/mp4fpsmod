@@ -39,9 +39,10 @@ private:
     uint32_t CalcTimeScale(FPSRange *begin, const FPSRange *end);
     uint64_t CalcSampleTimes(
 	    const FPSRange *begin, const FPSRange *end, uint32_t timeScale);
+    int64_t CalcCTSOffset();
     void DoEditTimeCodes(uint32_t timeScale, uint64_t duration);
     void UpdateStts();
-    int64_t UpdateCtts();
+    void UpdateCtts();
     void UpdateElst(int64_t duration, int64_t mediaTime);
 };
 

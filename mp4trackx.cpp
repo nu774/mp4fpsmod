@@ -154,8 +154,24 @@ uint64_t MP4TrackX::CalcSampleTimes(
     return static_cast<uint64_t>(offset);
 }
 
+int64_t MP4TrackX::CalcCTSOffset()
+{
+    int64_t maxdiff = 0;
+    std::vector<SampleTime>::iterator is;
+    for (is = m_sampleTimes.begin(); is != m_sampleTimes.end(); ++is) {
+	int64_t diff = is->dts - is->cts;
+	if (diff > maxdiff) maxdiff = diff;
+    }
+    for (is = m_sampleTimes.begin(); is != m_sampleTimes.end(); ++is) {
+	is->cts += maxdiff;
+	is->ctsOffset = is->cts - is->dts;
+    }
+    return maxdiff;
+}
+
 void MP4TrackX::DoEditTimeCodes(uint32_t timeScale, uint64_t duration)
 {
+    int64_t initialDelay = CalcCTSOffset();
     m_pTimeScaleProperty->SetValue(timeScale);
     m_pMediaDurationProperty->SetValue(0);
     UpdateDurations(duration);
@@ -175,7 +191,7 @@ void MP4TrackX::DoEditTimeCodes(uint32_t timeScale, uint64_t duration)
     
     UpdateStts();
     if (m_pCttsCountProperty) {
-	int64_t initialDelay = UpdateCtts();
+	UpdateCtts();
 	int64_t movieDuration = m_pTrackDurationProperty->GetValue();
 	UpdateElst(movieDuration, initialDelay);
     }
@@ -208,19 +224,8 @@ void MP4TrackX::UpdateStts()
     m_pSttsSampleCountProperty->IncrementValue(1, sttsIndex);
 }
 
-int64_t MP4TrackX::UpdateCtts()
+void MP4TrackX::UpdateCtts()
 {
-    int64_t maxdiff = 0;
-    std::vector<SampleTime>::iterator is;
-    for (is = m_sampleTimes.begin(); is != m_sampleTimes.end(); ++is) {
-	int64_t diff = is->dts - is->cts;
-	if (diff > maxdiff) maxdiff = diff;
-    }
-    for (is = m_sampleTimes.begin(); is != m_sampleTimes.end(); ++is) {
-	is->cts += maxdiff;
-	is->ctsOffset = is->cts - is->dts;
-    }
-    
     int32_t count = static_cast<int32_t>(m_pCttsCountProperty->GetValue());
     m_pCttsCountProperty->IncrementValue(-1 * count);
     m_pCttsSampleCountProperty->SetCount(0);
@@ -228,6 +233,7 @@ int64_t MP4TrackX::UpdateCtts()
 
     int32_t offset = -1;
     size_t cttsIndex = -1;
+    std::vector<SampleTime>::const_iterator is;
     for (is = m_sampleTimes.begin(); is != m_sampleTimes.end(); ++is) {
 	if (is->ctsOffset != offset) {
 	    offset = is->ctsOffset;
@@ -238,7 +244,6 @@ int64_t MP4TrackX::UpdateCtts()
 	}
 	m_pCttsSampleCountProperty->IncrementValue(1, cttsIndex);
     }
-    return maxdiff;
 }
 
 void MP4TrackX::UpdateElst(int64_t duration, int64_t mediaTime)
