@@ -176,7 +176,8 @@ int64_t MP4TrackX::CalcInitialDelay()
 int64_t MP4TrackX::CompressDTS(int64_t initialDelay)
 {
     size_t n = 0;
-    double scale = static_cast<double>(m_sampleTimes[1].dts) / initialDelay;
+    double off = m_sampleTimes[1].dts;
+    double scale = off / (initialDelay + off);
     int64_t prev_dts = 0;
     for (n = 1; n < m_sampleTimes.size(); ++n) {
 	int64_t dts = m_sampleTimes[n].dts;
