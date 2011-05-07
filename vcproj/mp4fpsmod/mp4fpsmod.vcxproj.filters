@@ -22,6 +22,9 @@
     <ClCompile Include="..\..\mp4filex.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\version.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\utf8_codecvt_facet.hpp">

@@ -20,6 +20,7 @@ struct Option {
     const char *src, *dst, *timecodeFile;
     bool compressDTS;
     bool optimizeTimecode;
+    bool printOnly;
     uint32_t timeScale;
     std::vector<FPSRange> ranges;
     std::vector<double> timecodes;
@@ -31,7 +32,11 @@ struct Option {
 	timecodeFile = 0;
 	compressDTS = false;
 	optimizeTimecode = false;
+	printOnly = false;
 	timeScale = 1000;
+    }
+    bool modified() {
+	return compressDTS || ranges.size() || timecodes.size();
     }
 };
 
@@ -217,6 +222,33 @@ void loadTimecodeV2(Option &option)
 }
 #endif
 
+void printTimeCodes(const Option &opt, const MP4TrackX &track)
+{
+#ifdef _WIN32
+    utf8_codecvt_facet u8codec;
+    std::wstring wname = m2w(opt.timecodeFile, utf8_codecvt_facet());
+    FILE *fp = _wfopen(wname.c_str(), L"w");
+#else
+    FILE *fp = std::fopen(opt.timeCodeFile, "w");
+#endif
+    if (!fp)
+	throw std::runtime_error("Can't open timecode file");
+    uint32_t timeScale = track.GetTimeScale();
+    const std::vector<uint32_t> &ctsIndex = track.GetCTSIndex();
+    const std::vector<SampleTime> &timeCodes = track.GetTimeCodes();
+    std::vector<uint32_t>::const_iterator it;
+    std::fputs("# timecode format v2\n", fp);
+    if (timeCodes.size()) {
+	int64_t off = timeCodes[ctsIndex[0]].cts;
+	for (it = ctsIndex.begin(); it != ctsIndex.end(); ++it) {
+	    int64_t cts = timeCodes[*it].cts - off;
+	    std::fprintf(fp, "%.15g\n",
+		static_cast<double>(cts) / timeScale * 1000.0);
+	}
+    }
+    std::fclose(fp);
+}
+
 void execute(Option &opt)
 {
     try {
@@ -228,11 +260,15 @@ void execute(Option &opt)
 	MP4TrackId trackId = file.FindTrackId(0, MP4_VIDEO_TRACK_TYPE);
 	mp4v2::impl::MP4Atom *trackAtom = file.FindTrackAtom(trackId, 0);
 	MP4TrackX track(file, *trackAtom);
+	if (opt.printOnly) {
+	    printTimeCodes(opt, track);
+	    return;
+	}
 	if (opt.compressDTS)
 	    track.EnableDTSCompression(true);
 	if (opt.ranges.size())
 	    track.SetFPS(&opt.ranges[0], opt.ranges.size());
-	else {
+	else if (opt.timecodeFile) {
 	    loadTimecodeV2(opt);
 	    if (opt.optimizeTimecode && convertToExactRanges(opt))
 		track.SetFPS(&opt.ranges[0], opt.ranges.size());
@@ -240,6 +276,10 @@ void execute(Option &opt)
 		track.SetTimeCodes(&opt.timecodes[0],
 			opt.timecodes.size(),
 			opt.timeScale);
+	}
+	if (opt.modified()) {
+	    track.AdjustTimeCodes();
+	    track.DoEditTimeCodes();
 	}
 	std::fprintf(stderr, "Saving MP4 stream...\n");
 	file.SaveTo(opt.dst);
@@ -249,18 +289,27 @@ void execute(Option &opt)
     }
 }
 
+const char *getversion();
+
 void usage()
 {
-    std::fputs(
-"usage: mp4fpsmod [-r NFRAMES:FPS ] [-t TIMECODE_V2_FILE ] [-x] [-c] -o DEST SRC\n"
-"  -t: Give timecodes with timecode-v2 file.\n"
-"  -x: Optimize timecode entry in timecode file.\n"
-"  -r: Specify fps and range which fps is applied to.\n"
-"      You can specify -r option more than two times to produce VFR movie.\n"
-"  -c: Enable DTS compression.\n"
-"  NFRAMES: integer, number of frames\n"
-"  FPS: integer, or fraction value. You can specity FPS like 25 or 30000/1001\n"
-	,stderr);
+    std::fprintf(stderr,
+"mp4fpsmod %s\n"
+"usage: mp4fpsmod [options] FILE\n"
+"  -o file    Specify MP4 output filename.\n"
+"  -p file    Output current timecodes into timecode-v2 format.\n"
+"  -t file    Edit timecodes with timecode-v2 file.\n"
+"  -x         When given with -t, optimize timecode entries in the file.\n"
+"  -r nframes:fps\n"
+"             Directly specify fps with option, and edit timecodes.\n"
+"             You can specify -r option more than two times to produce\n"
+"             VFR movie.\n"
+"             \"nframes\" is number of frames which \"fps\" is aplied to,\n"
+"             0 as nframes means \"rest of the movie\"\n"
+"             \"fps\" is a rational or integer. That is, something like \n"
+"             25 or 30000/1001\n"
+"  -c         Enable DTS compression.\n"
+    , getversion());
     std::exit(1);
 }
 
@@ -272,13 +321,16 @@ int main1(int argc, char **argv)
 	Option option;
 	int ch;
 
-	while ((ch = getopt(argc, argv, "r:t:o:xc")) != EOF) {
+	while ((ch = getopt(argc, argv, "r:p:t:o:xc")) != EOF) {
 	    if (ch == 'r') {
 		int nframes, num, denom = 1;
 		if (std::sscanf(optarg, "%d:%d/%d", &nframes, &num, &denom) < 2)
 		    usage();
 		FPSRange range = { nframes, num, denom };
 		option.ranges.push_back(range);
+	    } else if (ch == 'p') {
+		option.printOnly = true;
+		option.timecodeFile = optarg;
 	    } else if (ch == 't') {
 		option.timecodeFile = optarg;
 	    } else if (ch == 'o') {
@@ -291,10 +343,12 @@ int main1(int argc, char **argv)
 	}
 	argc -= optind;
 	argv += optind;
-	if (argc == 0 || option.dst == 0)
+	if (argc == 0 || (!option.printOnly && option.dst == 0))
 	    usage();
+	/*
 	if (option.ranges.size() == 0 && option.timecodeFile == 0)
 	    usage();
+	*/
 
 	option.src = argv[0];
 	execute(option);
