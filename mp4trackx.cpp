@@ -82,8 +82,7 @@ void MP4TrackX::FetchStts()
 
 void MP4TrackX::FetchCtts()
 {
-    if (!m_pCttsCountProperty)
-	return;
+    if (m_pCttsCountProperty)
     {
 	uint32_t numCtts = m_pCttsCountProperty->GetValue();
 	SampleTime *sp = &m_sampleTimes[0];
