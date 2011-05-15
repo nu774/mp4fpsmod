@@ -7,6 +7,8 @@ using mp4v2::impl::MP4Track;
 using mp4v2::impl::MP4Atom;
 using mp4v2::impl::MP4Property;
 using mp4v2::impl::MP4IntegerProperty;
+using mp4v2::impl::MP4Integer32Property;
+using mp4v2::impl::MP4LanguageCodeProperty;
 
 int gcd(int a, int b) { return !b ? a : gcd(b, a % b); }
 
@@ -17,18 +19,54 @@ double fps2tsdelta(int num, int denom, int timeScale)
     return static_cast<double>(timeScale) / num * denom;
 }
 
-MP4TrackX::MP4TrackX(MP4File &pFile, MP4Atom &pTrackAtom)
-    : MP4Track(pFile, pTrackAtom), m_compressDTS(false)
+void MP4TrackX::RebuildMdhd()
 {
-    m_timeScale = m_pTimeScaleProperty->GetValue();
-    FetchStts();
-    FetchCtts();
+    MP4Atom *mdhd = m_trakAtom.FindAtom("trak.mdia.mdhd");
+
+    MP4Property *prop;
+    mdhd->FindProperty("mdhd.timeScale", &prop);
+    uint32_t timeScale = dynamic_cast<MP4Integer32Property*>(prop)->GetValue();
+    mdhd->FindProperty("mdhd.duration", &prop);
+    uint64_t duration = dynamic_cast<MP4IntegerProperty*>(prop)->GetValue();
+    mdhd->FindProperty("mdhd.language", &prop);
+    mp4v2::impl::bmff::LanguageCode lang =
+	dynamic_cast<MP4LanguageCodeProperty*>(prop)->GetValue();
+
+    MP4Atom *mdia = mdhd->GetParentAtom();
+    mdia->DeleteChildAtom(mdhd);
+    delete mdhd;
+    mdhd = MP4Atom::CreateAtom(m_File, mdia, "mdhd");
+    mdia->InsertChildAtom(mdhd, 0);
+    mdhd->Generate();
+
+    // update caches
+    mdhd->FindProperty("mdhd.timeScale", &prop);
+    m_pTimeScaleProperty = dynamic_cast<MP4Integer32Property*>(prop);
+    m_pTimeScaleProperty->SetValue(timeScale);
+
+    mdhd->FindProperty("mdhd.duration", &prop);
+    m_pMediaDurationProperty= dynamic_cast<MP4IntegerProperty*>(prop);
+    m_pMediaDurationProperty->SetValue(duration);
+
+    mdhd->FindProperty("mdhd.modificationTime", &prop);
+    m_pMediaModificationProperty = dynamic_cast<MP4IntegerProperty*>(prop);
+
+    mdhd->FindProperty("mdhd.language", &prop);
+    dynamic_cast<MP4LanguageCodeProperty*>(prop)->SetValue(lang);
+}
+
+TrackEditor::TrackEditor(MP4TrackX *track)
+    : m_track(track), m_compressDTS(false)
+{
+    m_timeScale = m_track->GetTimeScale();
+    GetDTS();
+    GetCTS();
     for (size_t i = 0; i < m_sampleTimes.size(); ++i)
 	m_ctsIndex.push_back(i);
     std::sort(m_ctsIndex.begin(), m_ctsIndex.end(), CTSComparator(this));
 }
 
-void MP4TrackX::SetFPS(FPSRange *fpsRanges, size_t numRanges)
+void TrackEditor::SetFPS(FPSRange *fpsRanges, size_t numRanges)
 {
     uint32_t timeScale = CalcTimeScale(fpsRanges, fpsRanges + numRanges);
     uint64_t duration = CalcSampleTimes(
@@ -46,9 +84,9 @@ void MP4TrackX::SetFPS(FPSRange *fpsRanges, size_t numRanges)
 }
 
 void
-MP4TrackX::SetTimeCodes(double *timeCodes, size_t count, uint32_t timeScale)
+TrackEditor::SetTimeCodes(double *timeCodes, size_t count, uint32_t timeScale)
 {
-    if (count != GetNumberOfSamples())
+    if (count != m_track->GetNumberOfSamples())
 	throw std::runtime_error(
 		"timecode entry count differs from the movie");
 
@@ -65,13 +103,13 @@ MP4TrackX::SetTimeCodes(double *timeCodes, size_t count, uint32_t timeScale)
     m_mediaDuration = ioffset;
 }
 
-void MP4TrackX::FetchStts()
+void TrackEditor::GetDTS()
 {
-    uint32_t numStts = m_pSttsCountProperty->GetValue();
+    uint32_t numStts = m_track->SttsCountProperty()->GetValue();
     uint64_t dts = 0;
     for (uint32_t i = 0; i < numStts; ++i) {
-	uint32_t sampleCount = m_pSttsSampleCountProperty->GetValue(i);
-	uint32_t sampleDelta = m_pSttsSampleDeltaProperty->GetValue(i);
+	uint32_t sampleCount = m_track->SttsSampleCountProperty()->GetValue(i);
+	uint32_t sampleDelta = m_track->SttsSampleDeltaProperty()->GetValue(i);
 	for (uint32_t j = 0; j < sampleCount; ++j) {
 	    SampleTime st = { dts, 0 };
 	    m_sampleTimes.push_back(st);
@@ -80,15 +118,17 @@ void MP4TrackX::FetchStts()
     }
 }
 
-void MP4TrackX::FetchCtts()
+void TrackEditor::GetCTS()
 {
-    if (m_pCttsCountProperty)
+    if (m_track->CttsCountProperty())
     {
-	uint32_t numCtts = m_pCttsCountProperty->GetValue();
+	uint32_t numCtts = m_track->CttsCountProperty()->GetValue();
 	SampleTime *sp = &m_sampleTimes[0];
 	for (uint32_t i = 0; i < numCtts; ++i) {
-	    uint32_t sampleCount = m_pCttsSampleCountProperty->GetValue(i);
-	    uint32_t ctsOffset = m_pCttsSampleOffsetProperty->GetValue(i);
+	    uint32_t sampleCount =
+		m_track->CttsSampleCountProperty()->GetValue(i);
+	    uint32_t ctsOffset
+		= m_track->CttsSampleOffsetProperty()->GetValue(i);
 	    for (uint32_t j = 0; j < sampleCount; ++j) {
 		sp->ctsOffset = ctsOffset;
 		++sp;
@@ -104,7 +144,7 @@ void MP4TrackX::FetchCtts()
     }
 }
 
-uint32_t MP4TrackX::CalcTimeScale(FPSRange *begin, const FPSRange *end)
+uint32_t TrackEditor::CalcTimeScale(FPSRange *begin, const FPSRange *end)
 {
     uint32_t total = 0;
     FPSRange *fp;
@@ -113,7 +153,7 @@ uint32_t MP4TrackX::CalcTimeScale(FPSRange *begin, const FPSRange *end)
 	    total += fp->numFrames;
 	else {
 	    fp->numFrames = std::max(
-		static_cast<int>(GetNumberOfSamples() - total), 0);
+		static_cast<int>(m_track->GetNumberOfSamples() - total), 0);
 	    total += fp->numFrames;
 	}
     }
@@ -142,7 +182,7 @@ uint32_t MP4TrackX::CalcTimeScale(FPSRange *begin, const FPSRange *end)
     return timeScale;
 }
 
-uint64_t MP4TrackX::CalcSampleTimes(
+uint64_t TrackEditor::CalcSampleTimes(
 	const FPSRange *begin, const FPSRange *end, uint32_t timeScale)
 {
     double offset = 0.0;
@@ -160,7 +200,7 @@ uint64_t MP4TrackX::CalcSampleTimes(
     return static_cast<uint64_t>(offset);
 }
 
-int64_t MP4TrackX::CalcInitialDelay()
+int64_t TrackEditor::CalcInitialDelay()
 {
     int64_t maxdiff = 0;
     std::vector<SampleTime>::iterator is;
@@ -171,7 +211,7 @@ int64_t MP4TrackX::CalcInitialDelay()
     return maxdiff;
 }
 
-void MP4TrackX::CompressDTS()
+void TrackEditor::CompressDTS()
 {
     size_t n = 0;
     double off = m_sampleTimes[1].dts;
@@ -192,7 +232,7 @@ void MP4TrackX::CompressDTS()
     m_initialDelay = CalcInitialDelay();
 }
 
-void MP4TrackX::OffsetCTS(int64_t off)
+void TrackEditor::OffsetCTS(int64_t off)
 {
     std::vector<SampleTime>::iterator is;
     for (is = m_sampleTimes.begin(); is != m_sampleTimes.end(); ++is) {
@@ -201,7 +241,7 @@ void MP4TrackX::OffsetCTS(int64_t off)
     }
 }
 
-void MP4TrackX::AdjustTimeCodes()
+void TrackEditor::AdjustTimeCodes()
 {
     if (m_sampleTimes[0].cts > 0)
 	OffsetCTS(m_sampleTimes[0].cts * -1);
@@ -211,40 +251,46 @@ void MP4TrackX::AdjustTimeCodes()
     OffsetCTS(m_initialDelay);
 }
 
-void MP4TrackX::DoEditTimeCodes()
+void TrackEditor::DoEditTimeCodes()
 {
-    m_pTimeScaleProperty->SetValue(m_timeScale);
-    m_pMediaDurationProperty->SetValue(0);
-    UpdateDurations(m_mediaDuration);
+    if (m_timeScale != m_track->GetTimeScale()) {
+	m_track->RebuildMdhd();
+	m_track->TimeScaleProperty()->SetValue(m_timeScale);
+	m_track->MediaDurationProperty()->SetValue(0);
+	m_track->UpdateDurationsX(m_mediaDuration);
 
-    uint32_t ntracks = GetFile().GetNumberOfTracks();
-    int64_t max_duration = 0;
-    for (uint32_t i = 0; i < ntracks; ++i) {
-	MP4Track *track = GetFile().GetTrack(GetFile().FindTrackId(i));
-	MP4Atom &trackAtom = track->GetTrakAtom();
-	MP4Property *pProp;
-	if (trackAtom.FindProperty("trak.tkhd.duration", &pProp)) {
-	    int64_t v = dynamic_cast<MP4IntegerProperty*>(pProp)->GetValue();
-	    max_duration = std::max(max_duration, v);
+	MP4File &file = m_track->GetFile();
+	uint32_t ntracks = file.GetNumberOfTracks();
+	int64_t max_duration = 0;
+	for (uint32_t i = 0; i < ntracks; ++i) {
+	    MP4Track *track = file.GetTrack(file.FindTrackId(i));
+	    MP4Atom &trackAtom = track->GetTrakAtom();
+	    MP4Property *pProp;
+	    if (trackAtom.FindProperty("trak.tkhd.duration", &pProp)) {
+		int64_t v =
+		    dynamic_cast<MP4IntegerProperty*>(pProp)->GetValue();
+		max_duration = std::max(max_duration, v);
+	    }
 	}
+	file.SetDuration(max_duration);
     }
-    GetFile().SetDuration(max_duration);
     
     UpdateStts();
-    if (m_pCttsCountProperty) {
+    if (m_track->CttsCountProperty()) {
 	UpdateCtts();
-	int64_t movieDuration = m_pTrackDurationProperty->GetValue();
+	int64_t movieDuration = m_track->TrackDurationProperty()->GetValue();
 	UpdateElst(movieDuration, m_initialDelay);
     }
-    UpdateModificationTimes();
+    m_track->UpdateModificationTimesX();
 }
 
-void MP4TrackX::UpdateStts()
+void TrackEditor::UpdateStts()
 {
-    int32_t count = static_cast<int32_t>(m_pSttsCountProperty->GetValue());
-    m_pSttsCountProperty->IncrementValue(-1 * count);
-    m_pSttsSampleCountProperty->SetCount(0);
-    m_pSttsSampleDeltaProperty->SetCount(0);
+    int32_t count = static_cast<int32_t>(
+	    m_track->SttsCountProperty()->GetValue());
+    m_track->SttsCountProperty()->IncrementValue(-1 * count);
+    m_track->SttsSampleCountProperty()->SetCount(0);
+    m_track->SttsSampleDeltaProperty()->SetCount(0);
     
     uint64_t prev_dts = 0;
     int32_t prev_delta = -1;
@@ -254,23 +300,24 @@ void MP4TrackX::UpdateStts()
 	int32_t delta = static_cast<int32_t>(is->dts - prev_dts);
 	if (delta != prev_delta) {
 	    ++sttsIndex;
-	    m_pSttsCountProperty->IncrementValue();
-	    m_pSttsSampleCountProperty->AddValue(0);
-	    m_pSttsSampleDeltaProperty->AddValue(delta);
+	    m_track->SttsCountProperty()->IncrementValue();
+	    m_track->SttsSampleCountProperty()->AddValue(0);
+	    m_track->SttsSampleDeltaProperty()->AddValue(delta);
 	}
 	prev_dts = is->dts;
 	prev_delta = delta;
-	m_pSttsSampleCountProperty->IncrementValue(1, sttsIndex);
+	m_track->SttsSampleCountProperty()->IncrementValue(1, sttsIndex);
     }
-    m_pSttsSampleCountProperty->IncrementValue(1, sttsIndex);
+    m_track->SttsSampleCountProperty()->IncrementValue(1, sttsIndex);
 }
 
-void MP4TrackX::UpdateCtts()
+void TrackEditor::UpdateCtts()
 {
-    int32_t count = static_cast<int32_t>(m_pCttsCountProperty->GetValue());
-    m_pCttsCountProperty->IncrementValue(-1 * count);
-    m_pCttsSampleCountProperty->SetCount(0);
-    m_pCttsSampleOffsetProperty->SetCount(0);
+    int32_t count = static_cast<int32_t>(
+	    m_track->CttsCountProperty()->GetValue());
+    m_track->CttsCountProperty()->IncrementValue(-1 * count);
+    m_track->CttsSampleCountProperty()->SetCount(0);
+    m_track->CttsSampleOffsetProperty()->SetCount(0);
 
     int32_t offset = -1;
     size_t cttsIndex = -1;
@@ -279,24 +326,24 @@ void MP4TrackX::UpdateCtts()
 	if (is->ctsOffset != offset) {
 	    offset = is->ctsOffset;
 	    ++cttsIndex;
-	    m_pCttsCountProperty->IncrementValue();
-	    m_pCttsSampleCountProperty->AddValue(0);
-	    m_pCttsSampleOffsetProperty->AddValue(offset);
+	    m_track->CttsCountProperty()->IncrementValue();
+	    m_track->CttsSampleCountProperty()->AddValue(0);
+	    m_track->CttsSampleOffsetProperty()->AddValue(offset);
 	}
-	m_pCttsSampleCountProperty->IncrementValue(1, cttsIndex);
+	m_track->CttsSampleCountProperty()->IncrementValue(1, cttsIndex);
     }
 }
 
-void MP4TrackX::UpdateElst(int64_t duration, int64_t mediaTime)
+void TrackEditor::UpdateElst(int64_t duration, int64_t mediaTime)
 {
-    if (m_pElstCountProperty) {
-	size_t count = m_pElstCountProperty->GetValue();
+    if (m_track->ElstCountProperty()) {
+	size_t count = m_track->ElstCountProperty()->GetValue();
 	for (size_t i = 0; i < count; ++i)
-	    DeleteEdit(i + 1);
+	    m_track->DeleteEdit(i + 1);
     }
     if (mediaTime) {
-	AddEdit();
-	m_pElstMediaTimeProperty->SetValue(mediaTime);
-	m_pElstDurationProperty->SetValue(duration);
+	m_track->AddEdit();
+	m_track->ElstMediaTimeProperty()->SetValue(mediaTime);
+	m_track->ElstDurationProperty()->SetValue(duration);
     }
 }

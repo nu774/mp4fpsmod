@@ -222,7 +222,7 @@ void loadTimecodeV2(Option &option)
 }
 #endif
 
-void printTimeCodes(const Option &opt, const MP4TrackX &track)
+void printTimeCodes(const Option &opt, const TrackEditor &track)
 {
 #ifdef _WIN32
     utf8_codecvt_facet u8codec;
@@ -259,27 +259,29 @@ void execute(Option &opt)
 	std::fprintf(stderr, "Done reading\n");
 	MP4TrackId trackId = file.FindTrackId(0, MP4_VIDEO_TRACK_TYPE);
 	mp4v2::impl::MP4Atom *trackAtom = file.FindTrackAtom(trackId, 0);
-	MP4TrackX track(file, *trackAtom);
+	mp4v2::impl::MP4Track *track = file.GetTrack(trackId);
+	// XXX
+	TrackEditor editor(reinterpret_cast<MP4TrackX*>(track));
 	if (opt.printOnly) {
-	    printTimeCodes(opt, track);
+	    printTimeCodes(opt, editor);
 	    return;
 	}
 	if (opt.compressDTS)
-	    track.EnableDTSCompression(true);
+	    editor.EnableDTSCompression(true);
 	if (opt.ranges.size())
-	    track.SetFPS(&opt.ranges[0], opt.ranges.size());
+	    editor.SetFPS(&opt.ranges[0], opt.ranges.size());
 	else if (opt.timecodeFile) {
 	    loadTimecodeV2(opt);
 	    if (opt.optimizeTimecode && convertToExactRanges(opt))
-		track.SetFPS(&opt.ranges[0], opt.ranges.size());
+		editor.SetFPS(&opt.ranges[0], opt.ranges.size());
 	    else
-		track.SetTimeCodes(&opt.timecodes[0],
+		editor.SetTimeCodes(&opt.timecodes[0],
 			opt.timecodes.size(),
 			opt.timeScale);
 	}
 	if (opt.modified()) {
-	    track.AdjustTimeCodes();
-	    track.DoEditTimeCodes();
+	    editor.AdjustTimeCodes();
+	    editor.DoEditTimeCodes();
 	}
 	std::fprintf(stderr, "Saving MP4 stream...\n");
 	file.SaveTo(opt.dst);
