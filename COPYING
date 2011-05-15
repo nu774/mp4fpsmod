@@ -2,7 +2,7 @@ All files are distributed as Public Domain, except for the followings:
 
 Files under mp4v2:
 These are part of mp4v2 (http://code.google.com/p/mp4v2/),
-svn-r455
+svn-r465
 
 utf8_codecvt_facet.[ch]pp:
 These are part of Boost (http://www.boost.org/),
