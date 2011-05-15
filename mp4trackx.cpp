@@ -23,11 +23,10 @@ void MP4TrackX::RebuildMdhd()
 {
     MP4Atom *mdhd = m_trakAtom.FindAtom("trak.mdia.mdhd");
 
+    uint32_t timeScale = GetTimeScale();
+    uint64_t duration = m_pMediaDurationProperty->GetValue();
+
     MP4Property *prop;
-    mdhd->FindProperty("mdhd.timeScale", &prop);
-    uint32_t timeScale = dynamic_cast<MP4Integer32Property*>(prop)->GetValue();
-    mdhd->FindProperty("mdhd.duration", &prop);
-    uint64_t duration = dynamic_cast<MP4IntegerProperty*>(prop)->GetValue();
     mdhd->FindProperty("mdhd.language", &prop);
     mp4v2::impl::bmff::LanguageCode lang =
 	dynamic_cast<MP4LanguageCodeProperty*>(prop)->GetValue();
