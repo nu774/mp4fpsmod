@@ -55,11 +55,11 @@ void MP4TrackX::RebuildMdhd()
 }
 
 TrackEditor::TrackEditor(MP4TrackX *track)
-    : m_track(track), m_compressDTS(false)
+    : m_track(track), m_compressDTS(false), m_audioDelay(0)
 {
     m_timeScale = m_track->GetTimeScale();
-    GetDTS();
-    GetCTS();
+    LoadDTS();
+    LoadCTS();
     for (size_t i = 0; i < m_sampleTimes.size(); ++i)
 	m_ctsIndex.push_back(i);
     std::sort(m_ctsIndex.begin(), m_ctsIndex.end(), CTSComparator(this));
@@ -79,7 +79,6 @@ void TrackEditor::SetFPS(FPSRange *fpsRanges, size_t numRanges)
 		timeScale);
     }
     m_timeScale = timeScale;
-    m_mediaDuration = duration;
 }
 
 void
@@ -92,17 +91,14 @@ TrackEditor::SetTimeCodes(double *timeCodes, size_t count, uint32_t timeScale)
     uint64_t ioffset = 0;
     int64_t delta = 0;
     for (size_t i = 0; i < count; ++i) {
-	delta = static_cast<uint64_t>(timeCodes[i]) - ioffset;
+	delta = static_cast<uint64_t>(timeCodes[i] + 0.5) - ioffset;
 	ioffset += delta;
-	m_sampleTimes[i].dts = ioffset;
-	m_sampleTimes[m_ctsIndex[i]].cts = ioffset;
+	DTS(i) = CTS(i) = ioffset;
     }
-    ioffset += delta;
     m_timeScale = timeScale;
-    m_mediaDuration = ioffset;
 }
 
-void TrackEditor::GetDTS()
+void TrackEditor::LoadDTS()
 {
     uint32_t numStts = m_track->SttsCountProperty()->GetValue();
     uint64_t dts = 0;
@@ -110,14 +106,14 @@ void TrackEditor::GetDTS()
 	uint32_t sampleCount = m_track->SttsSampleCountProperty()->GetValue(i);
 	uint32_t sampleDelta = m_track->SttsSampleDeltaProperty()->GetValue(i);
 	for (uint32_t j = 0; j < sampleCount; ++j) {
-	    SampleTime st = { dts, 0 };
+	    SampleTime st = { dts, dts };
 	    m_sampleTimes.push_back(st);
 	    dts += sampleDelta;
 	}
     }
 }
 
-void TrackEditor::GetCTS()
+void TrackEditor::LoadCTS()
 {
     if (m_track->CttsCountProperty())
     {
@@ -129,16 +125,9 @@ void TrackEditor::GetCTS()
 	    uint32_t ctsOffset
 		= m_track->CttsSampleOffsetProperty()->GetValue(i);
 	    for (uint32_t j = 0; j < sampleCount; ++j) {
-		sp->ctsOffset = ctsOffset;
+		sp->cts = sp->dts + ctsOffset;
 		++sp;
 	    }
-	}
-    }
-    {
-	SampleTime *sp = &m_sampleTimes[0];
-	for (size_t i = 0; i < m_sampleTimes.size(); ++i) {
-	    sp->cts = sp->dts + sp->ctsOffset;
-	    ++sp;
 	}
     }
 }
@@ -189,14 +178,13 @@ uint64_t TrackEditor::CalcSampleTimes(
     for (const FPSRange *fp = begin; fp != end; ++fp) {
 	double delta = fps2tsdelta(fp->fps_num, fp->fps_denom, timeScale);
 	for (uint32_t i = 0; i < fp->numFrames; ++i) {
-	    uint64_t ioffset = static_cast<uint64_t>(offset);
-	    m_sampleTimes[frame].dts = ioffset;
-	    m_sampleTimes[m_ctsIndex[frame]].cts = ioffset;
+	    uint64_t ioffset = static_cast<uint64_t>(offset + 0.5);
+	    DTS(frame) = CTS(frame) = ioffset;
 	    offset += delta; 
 	    ++frame;
 	}
     }
-    return static_cast<uint64_t>(offset);
+    return static_cast<uint64_t>(offset + 0.5);
 }
 
 int64_t TrackEditor::CalcInitialDelay()
@@ -210,56 +198,104 @@ int64_t TrackEditor::CalcInitialDelay()
     return maxdiff;
 }
 
-void TrackEditor::CompressDTS()
+const double TC_COMPRESS_SCALE_MIN = 0.5;
+
+/*
+ * TimeCode is a functor/function, such that timeCode(n) returns the
+ * reference to nth timecode.
+ */
+template <typename TimeCode>
+void TrackEditor::CompressTimeCodes(int64_t offset, TimeCode timeCode)
 {
+    if (!GetFrameCount())
+	return;
     size_t n = 0;
-    double off = m_sampleTimes[1].dts;
-    double scale = off / (m_initialDelay + off);
-    int64_t prev_dts = 0;
-    for (n = 1; n < m_sampleTimes.size(); ++n) {
-	int64_t dts = m_sampleTimes[n].dts;
-	if (dts - m_initialDelay > prev_dts)
+    double off = timeCode(1);
+    double scale = std::max((off / (offset + off)), TC_COMPRESS_SCALE_MIN);
+    int64_t prev = 0;
+    for (n = 1; n < GetFrameCount(); ++n) {
+	int64_t orig = timeCode(n);
+	if (orig - offset >= prev + (off * scale)) break;
+	int64_t cur = orig * scale + 0.5;
+	if (cur == prev) ++cur;
+	timeCode(n) = prev = cur;
+    }
+    for (size_t i = n; i < GetFrameCount(); ++i)
+	timeCode(i) -= offset;
+}
+
+const double TC_DELAY_SCALE = 4.0;
+
+template <typename TimeCode>
+void TrackEditor::DelayTimeCodes(int64_t offset, TimeCode timeCode)
+{
+    if (!GetFrameCount())
+	return;
+    size_t n = 0;
+    double off = timeCode(1);
+    double factor = 2.0;
+    double scale;
+    do {
+	scale = (offset / factor + off) / off;
+	factor += 1.0;
+    } while (scale > TC_DELAY_SCALE);
+    int64_t prev = 0;
+    for (n = 1; n < GetFrameCount(); ++n) {
+	int64_t orig = timeCode(n);
+	int64_t cur = orig * scale + 0.5;
+	if (cur >= orig + offset)
 	    break;
-	int64_t new_dts = dts * scale;
-	if (new_dts == prev_dts)
-	    ++new_dts;
-	m_sampleTimes[n].dts = prev_dts = new_dts;
+	timeCode(n) = prev = cur;
     }
-    for (size_t i = n; i < m_sampleTimes.size(); ++i) {
-	m_sampleTimes[i].dts -= m_initialDelay;
-    }
-    m_initialDelay = CalcInitialDelay();
+    for (size_t i = n; i < GetFrameCount(); ++i)
+	timeCode(i) += offset;
 }
 
 void TrackEditor::OffsetCTS(int64_t off)
 {
     std::vector<SampleTime>::iterator is;
-    for (is = m_sampleTimes.begin(); is != m_sampleTimes.end(); ++is) {
+    for (is = m_sampleTimes.begin(); is != m_sampleTimes.end(); ++is)
 	is->cts += off;
-	is->ctsOffset = is->cts - is->dts;
-    }
 }
 
 void TrackEditor::AdjustTimeCodes()
 {
-    if (m_sampleTimes[0].cts > 0)
-	OffsetCTS(m_sampleTimes[0].cts * -1);
+    std::binder1st<std::mem_fun1_t<uint64_t&, TrackEditor, size_t> >
+	ctsf = std::bind1st(std::mem_fun(&TrackEditor::CTS), this),
+	dtsf = std::bind1st(std::mem_fun(&TrackEditor::DTS), this);
+
+    if (m_compressDTS && m_audioDelay < 0) {
+	if (m_audioDelay < 0) {
+	    int64_t delay = -1 * GetAudioDelayInTimeScale();
+	    DelayTimeCodes(delay, ctsf);
+	    DelayTimeCodes(delay, dtsf);
+	}
+    }
+    if (CTS(0) > 0)
+	OffsetCTS(CTS(0) * -1);
+    if (m_compressDTS && m_audioDelay > 0)
+	CompressTimeCodes(GetAudioDelayInTimeScale(), ctsf);
     m_initialDelay = CalcInitialDelay();
-    if (m_compressDTS)
-	CompressDTS();
+    if (m_compressDTS) {
+	CompressTimeCodes(m_initialDelay, dtsf);
+	m_initialDelay = CalcInitialDelay();
+    }
     OffsetCTS(m_initialDelay);
 }
 
 void TrackEditor::DoEditTimeCodes()
 {
-    if (m_timeScale != m_track->GetTimeScale()) {
+    MP4File &file = m_track->GetFile();
+    uint32_t ntracks = file.GetNumberOfTracks();
+
+    if (m_timeScale != m_track->GetTimeScale() ||
+	GetMediaDuration() != m_track->MediaDurationProperty()->GetValue())
+    {
 	m_track->RebuildMdhd();
 	m_track->TimeScaleProperty()->SetValue(m_timeScale);
 	m_track->MediaDurationProperty()->SetValue(0);
-	m_track->UpdateDurationsX(m_mediaDuration);
+	m_track->UpdateDurationsX(GetMediaDuration());
 
-	MP4File &file = m_track->GetFile();
-	uint32_t ntracks = file.GetNumberOfTracks();
 	int64_t max_duration = 0;
 	for (uint32_t i = 0; i < ntracks; ++i) {
 	    MP4Track *track = file.GetTrack(file.FindTrackId(i));
@@ -277,10 +313,23 @@ void TrackEditor::DoEditTimeCodes()
     UpdateStts();
     if (m_track->CttsCountProperty()) {
 	UpdateCtts();
-	int64_t movieDuration = m_track->TrackDurationProperty()->GetValue();
-	UpdateElst(movieDuration, m_initialDelay);
     }
+    int64_t delay = m_initialDelay;
+    if (!m_compressDTS && m_audioDelay > 0)
+	delay += GetAudioDelayInTimeScale();
+    UpdateElst(m_track, delay);
     m_track->UpdateModificationTimesX();
+    for (uint32_t i = 0; i < ntracks; ++i) {
+	MP4TrackX *track = reinterpret_cast<MP4TrackX*>(
+	    file.GetTrack(file.FindTrackId(i)));
+	if (std::strcmp(track->GetType(), "soun"))
+	    continue;
+	delay = (!m_compressDTS && m_audioDelay < 0)
+	    ? -1 * m_audioDelay / 1000.0 * track->GetTimeScale()
+	    : 0;
+	UpdateElst(track, delay);
+	track->UpdateModificationTimesX();
+    }
 }
 
 void TrackEditor::UpdateStts()
@@ -322,8 +371,9 @@ void TrackEditor::UpdateCtts()
     size_t cttsIndex = -1;
     std::vector<SampleTime>::const_iterator is;
     for (is = m_sampleTimes.begin(); is != m_sampleTimes.end(); ++is) {
-	if (is->ctsOffset != offset) {
-	    offset = is->ctsOffset;
+	int32_t ctsoff = is->cts - is->dts;
+	if (ctsoff != offset) {
+	    offset = ctsoff;
 	    ++cttsIndex;
 	    m_track->CttsCountProperty()->IncrementValue();
 	    m_track->CttsSampleCountProperty()->AddValue(0);
@@ -333,16 +383,17 @@ void TrackEditor::UpdateCtts()
     }
 }
 
-void TrackEditor::UpdateElst(int64_t duration, int64_t mediaTime)
+void TrackEditor::UpdateElst(MP4TrackX *track, int64_t mediaTime)
 {
-    if (m_track->ElstCountProperty()) {
-	size_t count = m_track->ElstCountProperty()->GetValue();
+    int64_t duration = track->TrackDurationProperty()->GetValue();
+    if (track->ElstCountProperty()) {
+	size_t count = track->ElstCountProperty()->GetValue();
 	for (size_t i = 0; i < count; ++i)
-	    m_track->DeleteEdit(i + 1);
+	    track->DeleteEdit(i + 1);
     }
     if (mediaTime) {
-	m_track->AddEdit();
-	m_track->ElstMediaTimeProperty()->SetValue(mediaTime);
-	m_track->ElstDurationProperty()->SetValue(duration);
+	track->AddEdit();
+	track->ElstMediaTimeProperty()->SetValue(mediaTime);
+	track->ElstDurationProperty()->SetValue(duration);
     }
 }

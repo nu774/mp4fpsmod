@@ -5,7 +5,6 @@
 
 struct SampleTime {
     uint64_t dts, cts;
-    uint32_t ctsOffset;
 };
 
 struct FPSRange {
@@ -87,44 +86,50 @@ class TrackEditor {
     std::vector<SampleTime> m_sampleTimes;
     std::vector<uint32_t> m_ctsIndex;
     uint32_t m_timeScale;
-    uint64_t m_mediaDuration;
     int64_t m_initialDelay;
     bool m_compressDTS;
+    int m_audioDelay;
 public:
     TrackEditor(MP4TrackX *track);
-    void EnableDTSCompression(bool enable)
-    {
-	m_compressDTS = enable;
-    }
+    void EnableDTSCompression(bool enable) { m_compressDTS = enable; }
+    void SetAudioDelay(int delay) { m_audioDelay = delay; }
     void SetFPS(FPSRange *fpsRanges, size_t numRanges);
     void SetTimeCodes(double *timeCodes, size_t count, uint32_t timeScale);
     void AdjustTimeCodes();
     void DoEditTimeCodes();
     uint32_t GetTimeScale() const { return m_timeScale; }
-    const std::vector<SampleTime> &GetTimeCodes() const
-    {
-	return m_sampleTimes;
+    size_t GetFrameCount() const { return m_sampleTimes.size(); }
+    uint64_t DTS(size_t n) const { return m_sampleTimes[n].dts; }
+    uint64_t &DTS(size_t n) { return m_sampleTimes[n].dts; }
+    uint64_t CTS(size_t n) const { return m_sampleTimes[m_ctsIndex[n]].cts; }
+    uint64_t &CTS(size_t n) { return m_sampleTimes[m_ctsIndex[n]].cts; }
+    uint64_t GetMediaDuration() const {
+	return CTS(GetFrameCount()-1) * 2 - CTS(GetFrameCount()-2);
     }
-    const std::vector<uint32_t> &GetCTSIndex() const
-    {
-	return m_ctsIndex;
-    }
+
 private:
     bool CompareByCTS(uint32_t a, uint32_t b)
     {
 	return m_sampleTimes[a].cts < m_sampleTimes[b].cts;
     }
-    void GetDTS();
-    void GetCTS();
+    void LoadDTS();
+    void LoadCTS();
     uint32_t CalcTimeScale(FPSRange *begin, const FPSRange *end);
     uint64_t CalcSampleTimes(
 	    const FPSRange *begin, const FPSRange *end, uint32_t timeScale);
-    void CompressDTS();
+    template <typename TimeCode>
+    void DelayTimeCodes(int64_t offset, TimeCode timeCode);
+    template <typename TimeCode>
+    void CompressTimeCodes(int64_t offset, TimeCode timeCode);
     void OffsetCTS(int64_t off);
     int64_t CalcInitialDelay();
     void UpdateStts();
     void UpdateCtts();
-    void UpdateElst(int64_t duration, int64_t mediaTime);
+    void UpdateElst(MP4TrackX *track, int64_t mediaTime);
+    int64_t GetAudioDelayInTimeScale()
+    {
+	return m_audioDelay / 1000.0 * m_timeScale;
+    }
 };
 
 #endif

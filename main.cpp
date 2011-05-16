@@ -22,6 +22,7 @@ struct Option {
     bool optimizeTimecode;
     bool printOnly;
     uint32_t timeScale;
+    int audioDelay;
     std::vector<FPSRange> ranges;
     std::vector<double> timecodes;
 
@@ -34,9 +35,10 @@ struct Option {
 	optimizeTimecode = false;
 	printOnly = false;
 	timeScale = 1000;
+	audioDelay = 0;
     }
     bool modified() {
-	return compressDTS || ranges.size() || timecodes.size();
+	return compressDTS || audioDelay || ranges.size() || timecodes.size();
     }
 };
 
@@ -125,7 +127,7 @@ void groupbyAdjacent(InputIterator begin, InputIterator end,
     result->swap(groups);
 }
 
-void normalizeTimecode(Option &opt)
+void averageTimecode(Option &opt)
 {
     std::vector<double> &tc = opt.timecodes;
     std::vector<int> deltas;
@@ -162,6 +164,28 @@ void normalizeTimecode(Option &opt)
     }
 }
 
+void rescaleTimecode(Option &opt)
+{
+    size_t n = opt.timecodes.size();
+    double delta = opt.timecodes[n-1] - opt.timecodes[n-2];
+    double duration = opt.timecodes[n-1] + delta;
+
+    int timeScale = opt.timeScale;
+    double scale = 1;
+    double scaleMax = 0x7fffffff / duration;
+    if (scaleMax < 1.0) {
+	while (scale > scaleMax)
+	    scale /= 10.0;
+    } else if (opt.timeScale < 100) {
+	while (scale < scaleMax)
+	    scale *= 10.0;
+	scale /= 10.0;
+    }
+    for (size_t i = 0; i < n; ++i)
+       opt.timecodes[i] *= scale;
+    opt.timeScale *= scale;
+}
+
 void parseTimecodeV2(Option &opt, std::istream &is)
 {
     std::string line;
@@ -177,19 +201,9 @@ void parseTimecodeV2(Option &opt, std::istream &is)
     if (!opt.timecodes.size())
 	throw std::runtime_error("No entry in the timecode file");
     if (opt.optimizeTimecode && !is_float)
-	normalizeTimecode(opt);
-    if ((opt.optimizeTimecode || is_float) && opt.timecodes.size() > 1) {
-	size_t n = opt.timecodes.size();
-	double delta = opt.timecodes[n-1] - opt.timecodes[n-2];
-	double duration = opt.timecodes[n-1] + delta;
-	int scale, scaleMax = static_cast<int>(0x7fffffff / duration);
-	for (scale = 10; scale < scaleMax; scale *= 10)
-	    ;
-	scale /= 10;
-	for (size_t i = 0; i < n; ++i)
-	   opt.timecodes[i] *= scale;
-	opt.timeScale *= scale;
-    }
+	averageTimecode(opt);
+    if ((opt.optimizeTimecode || is_float) && opt.timecodes.size() > 1)
+	rescaleTimecode(opt);
 }
 
 #ifdef _WIN32
@@ -227,21 +241,22 @@ void printTimeCodes(const Option &opt, const TrackEditor &track)
 #ifdef _WIN32
     utf8_codecvt_facet u8codec;
     std::wstring wname = m2w(opt.timecodeFile, utf8_codecvt_facet());
-    FILE *fp = _wfopen(wname.c_str(), L"w");
+    FILE *fp = std::strcmp(opt.timecodeFile, "-")
+	       ? _wfopen(wname.c_str(), L"w")
+	       : stdout;
 #else
-    FILE *fp = std::fopen(opt.timeCodeFile, "w");
+    FILE *fp = std::strcmp(opt.timecodeFile, "-")
+	       ? std::fopen(opt.timecodeFile, "w")
+	       : stdout;
 #endif
     if (!fp)
 	throw std::runtime_error("Can't open timecode file");
     uint32_t timeScale = track.GetTimeScale();
-    const std::vector<uint32_t> &ctsIndex = track.GetCTSIndex();
-    const std::vector<SampleTime> &timeCodes = track.GetTimeCodes();
-    std::vector<uint32_t>::const_iterator it;
     std::fputs("# timecode format v2\n", fp);
-    if (timeCodes.size()) {
-	int64_t off = timeCodes[ctsIndex[0]].cts;
-	for (it = ctsIndex.begin(); it != ctsIndex.end(); ++it) {
-	    int64_t cts = timeCodes[*it].cts - off;
+    if (track.GetFrameCount()) {
+	uint64_t off = track.CTS(0);
+	for (size_t i = 0; i < track.GetFrameCount(); ++i) {
+	    uint64_t cts = track.CTS(i) - off;
 	    std::fprintf(fp, "%.15g\n",
 		static_cast<double>(cts) / timeScale * 1000.0);
 	}
@@ -266,12 +281,23 @@ void execute(Option &opt)
 	    printTimeCodes(opt, editor);
 	    return;
 	}
+	editor.SetAudioDelay(opt.audioDelay);
 	if (opt.compressDTS)
 	    editor.EnableDTSCompression(true);
 	if (opt.ranges.size())
 	    editor.SetFPS(&opt.ranges[0], opt.ranges.size());
-	else if (opt.timecodeFile) {
-	    loadTimecodeV2(opt);
+	else if (opt.timecodeFile || opt.modified()) {
+	    if (opt.timecodeFile)
+    		loadTimecodeV2(opt);
+	    else {
+		uint64_t off = editor.CTS(0);
+		opt.timeScale = editor.GetTimeScale();
+		for (size_t i = 0; i < editor.GetFrameCount(); ++i)
+		    opt.timecodes.push_back(editor.CTS(i) - off);
+		if (opt.optimizeTimecode)
+		    averageTimecode(opt);
+		rescaleTimecode(opt);
+	    }
 	    if (opt.optimizeTimecode && convertToExactRanges(opt))
 		editor.SetFPS(&opt.ranges[0], opt.ranges.size());
 	    else
@@ -298,22 +324,35 @@ void usage()
     std::fprintf(stderr,
 "mp4fpsmod %s\n"
 "usage: mp4fpsmod [options] FILE\n"
-"  -o file    Specify MP4 output filename.\n"
-"  -p file    Output current timecodes into timecode-v2 format.\n"
-"  -t file    Edit timecodes with timecode-v2 file.\n"
-"  -x         When given with -t, optimize timecode entries in the file.\n"
-"  -r nframes:fps\n"
-"             Directly specify fps with option, and edit timecodes.\n"
-"             You can specify -r option more than two times to produce\n"
-"             VFR movie.\n"
-"             \"nframes\" is number of frames which \"fps\" is aplied to,\n"
-"             0 as nframes means \"rest of the movie\"\n"
-"             \"fps\" is a rational or integer. That is, something like \n"
-"             25 or 30000/1001\n"
-"  -c         Enable DTS compression.\n"
+"  -o <file>             Specify MP4 output filename.\n"
+"  -p, --print <file>    Output current timecodes into timecode-v2 format.\n"
+"  -t, --tcfile <file>   Edit timecodes with timecode-v2 file.\n"
+"  -x, --optimize        When given with -t, optimize timecode entries\n"
+"                        in the file.\n"
+"  -r, --fps <nframes:fps>\n"
+"                        Edit timecodes with the spec.\n"
+"                        You can specify -r more than two times, to produce\n"
+"                        VFR movie.\n"
+"                        \"nframes\" is number of frames, which \"fps\" is\n"
+"                        aplied to.\n"
+"                        0 as nframes means \"rest of the movie\"\n"
+"                        \"fps\" is a rational or integer.\n"
+"                        For example, 25 or 30000/1001.\n"
+"  -c, --compress-dts    Enable DTS compression.\n"
+"  -d, --delay <n>       Delay audio by n millisecond.\n"
     , getversion());
     std::exit(1);
 }
+
+static struct option long_options[] = {
+    { "print", required_argument, 0, 'p' },
+    { "fps", required_argument, 0, 'r' },
+    { "tcfile", required_argument, 0, 't' },
+    { "delay", required_argument, 0, 'd' },
+    { "optimize", no_argument, 0, 'x' },
+    { "compress-dts", no_argument, 0, 'c' },
+    { 0, 0, 0, 0 }
+};
 
 int main1(int argc, char **argv)
 {
@@ -323,7 +362,8 @@ int main1(int argc, char **argv)
 	Option option;
 	int ch;
 
-	while ((ch = getopt(argc, argv, "r:p:t:o:xc")) != EOF) {
+	while ((ch = getopt_long(argc, argv, "o:p:r:t:d:xcQ",
+			long_options, 0)) != EOF) {
 	    if (ch == 'r') {
 		int nframes, num, denom = 1;
 		if (std::sscanf(optarg, "%d:%d/%d", &nframes, &num, &denom) < 2)
@@ -335,6 +375,11 @@ int main1(int argc, char **argv)
 		option.timecodeFile = optarg;
 	    } else if (ch == 't') {
 		option.timecodeFile = optarg;
+	    } else if (ch == 'd') {
+		int delay;
+		if (std::sscanf(optarg, "%d", &delay) != 1)
+		    usage();
+		option.audioDelay = delay;
 	    } else if (ch == 'o') {
 		option.dst = optarg;
 	    } else if (ch == 'x') {
@@ -347,11 +392,10 @@ int main1(int argc, char **argv)
 	argv += optind;
 	if (argc == 0 || (!option.printOnly && option.dst == 0))
 	    usage();
-	/*
-	if (option.ranges.size() == 0 && option.timecodeFile == 0)
-	    usage();
-	*/
-
+	if (!option.printOnly && option.timecodeFile && option.ranges.size()) {
+	    fprintf(stderr, "-t and -r are exclusive\n");
+	    return 1;
+	}
 	option.src = argv[0];
 	execute(option);
 	return 0;
