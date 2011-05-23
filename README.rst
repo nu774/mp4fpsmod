@@ -128,7 +128,7 @@ In the mp4 container, stts box(which holds DTS delta) will look like this::
     <TimeToSampleEntry SampleDelta="4004" SampleCount="300"/>
     <TimeToSampleEntry SampleDelta="5005" SampleCount="400"/>
 
-Timecodes of this movie will be with something like this, if B-frame is used:
+Timecodes of this movie will be with something like this, if B-frame is used::
 
     ------------ --------
     DTS          CTS
@@ -142,7 +142,7 @@ Timecodes of this movie will be with something like this, if B-frame is used:
     ------------ --------
 
 However, this doesn't satisfy DTS <= CTS, for some frames.
-Therefore, we have to shift(delay) CTS.  Finally, we get:
+Therefore, we have to shift(delay) CTS.  Finally, we get::
 
     ------------ -----
     DTS          CTS
@@ -166,7 +166,7 @@ DTS compression comes for this reason.
 If you enable DTS compression with "-c" option, mp4fpsmod produces smaller 
 DTS at beginning, and minimizes the CTS delay without the help of
 edts/elst box.
-With DTS compression, DTS and CTS will be something like this:
+With DTS compression, DTS and CTS will be something like this::
 
     ----------- -----
     DTS          CTS
