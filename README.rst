@@ -128,7 +128,7 @@ In the mp4 container, stts box(which holds DTS delta) will look like this::
     <TimeToSampleEntry SampleDelta="4004" SampleCount="300"/>
     <TimeToSampleEntry SampleDelta="5005" SampleCount="400"/>
 
-Timecodes of this movie will be with something like this, if B-frame is used::
+Timecodes of this movie will be something like this, if B-frame is used::
 
     ------------ --------
     DTS          CTS
