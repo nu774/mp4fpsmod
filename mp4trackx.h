@@ -104,7 +104,7 @@ public:
     uint64_t CTS(size_t n) const { return m_sampleTimes[m_ctsIndex[n]].cts; }
     uint64_t &CTS(size_t n) { return m_sampleTimes[m_ctsIndex[n]].cts; }
     uint64_t GetMediaDuration() const {
-	return CTS(GetFrameCount()-1) * 2 - CTS(GetFrameCount()-2);
+	return CTS(GetFrameCount()-1) * 2 - CTS(GetFrameCount()-2) - CTS(0);
     }
 
 private:
