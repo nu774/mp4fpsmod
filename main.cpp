@@ -38,7 +38,8 @@ struct Option {
 	audioDelay = 0;
     }
     bool modified() {
-	return compressDTS || audioDelay || ranges.size() || timecodes.size();
+	return compressDTS || audioDelay || ranges.size()
+	    || timecodes.size() || optimizeTimecode;
     }
 };
 
@@ -87,12 +88,11 @@ bool convertToExactRanges(Option &opt)
 	prev = *dp;
     }
     ++ranges.back().numFrames;
-    std::fprintf(stderr, "\nConverted to exact fps ranges\n");
+    std::fprintf(stderr, "Converted to exact fps ranges\n");
     for (size_t i = 0; i < ranges.size(); ++i) {
 	std::fprintf(stderr, "%d frames: fps %d/%d\n",
 	    ranges[i].numFrames, ranges[i].fps_num, ranges[i].fps_denom);
     }
-    std::putc('\n', stderr);
     opt.ranges.swap(ranges);
     return true;
 }
@@ -148,13 +148,12 @@ void averageTimecode(Option &opt)
 	double average = static_cast<double>(sum) / kk->size();
 	averages.push_back(average);
     }
-    std::fprintf(stderr, "\nDivided into %d group%s\n",
+    std::fprintf(stderr, "Divided into %d group%s\n",
 	    groups.size(), (groups.size() == 1) ? "" : "s");
     for (size_t i = 0; i < groups.size(); ++i) {
 	std::fprintf(stderr, "%d frames: time delta %g\n",
 		groups[i].size(), averages[i]);
     }
-    std::putc('\n', stderr);
 
     tc.clear();
     tc.push_back(0.0);
@@ -177,6 +176,7 @@ void rescaleTimecode(Option &opt)
 	while (scale > scaleMax)
 	    scale /= 10.0;
     } else if (opt.timeScale < 100) {
+	scaleMax = std::min(scaleMax, 10000.0 / opt.timeScale);
 	while (scale < scaleMax)
 	    scale *= 10.0;
 	scale /= 10.0;
@@ -327,8 +327,7 @@ void usage()
 "  -o <file>             Specify MP4 output filename.\n"
 "  -p, --print <file>    Output current timecodes into timecode-v2 format.\n"
 "  -t, --tcfile <file>   Edit timecodes with timecode-v2 file.\n"
-"  -x, --optimize        When given with -t, optimize timecode entries\n"
-"                        in the file.\n"
+"  -x, --optimize        Optimize timecode\n"
 "  -r, --fps <nframes:fps>\n"
 "                        Edit timecodes with the spec.\n"
 "                        You can specify -r more than two times, to produce\n"

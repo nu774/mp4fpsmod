@@ -47,34 +47,34 @@ Usage
 -----
 
 ::
-
-  -o file    Specify MP4 output filename.
-  -p file    Output current timecodes into timecode-v2 format.
-  -t file    Edit timecodes with timecode-v2 file.
-  -x         When given with -t, optimize timecode entries in the file.
-  -r nframes:fps
-             Directly specify fps with option, and edit timecodes.
-             You can specify -r option more than two times to produce
-             VFR movie.
-             "nframes" is number of frames which \"fps\" is aplied to,
-             0 as nframes means "rest of the movie"
-             "fps" is a rational or integer. That is, something like
-             25 or 30000/1001.
-  -c         Enable DTS compression.
-  -d n       Delay audio by n millisecond.
+  -o <file>             Specify MP4 output filename.
+  -p, --print <file>    Output current timecodes into timecode-v2 format.
+  -t, --tcfile <file>   Edit timecodes with timecode-v2 file.
+  -x, --optimize        Optimize timecode
+  -r, --fps <nframes:fps>
+                        Edit timecodes with the spec.
+                        You can specify -r more than two times, to produce
+                        VFR movie.
+                        "nframes" is number of frames, which "fps" is
+                        aplied to.
+                        0 as nframes means "rest of the movie"
+                        "fps" is a rational or integer.
+                        For example, 25 or 30000/1001.
+  -c, --compress-dts    Enable DTS compression.
+  -d, --delay <n>       Delay audio by n millisecond.
 
 In any cases, the original mp4 is kept as it is (not touched).
 -o is required except when you specify -p.
 On the other hand, when you specify -p, other options are ignored.
 
 -t and -r are exclusive, and cannot be set both at the same time.
--c and/or -d can be set standalone, or with -t or -r.
+-c, -d, -x can be set standalone, or with -t or -r.
 
-When you specify one of -t, -r, -c, -d, timecode is edited/rewritten.
+When you specify one of -t, -r, -x, -c, -d, timecode is edited/rewritten.
 Otherwise without -p, input is just copied with moov->mdat order, without
 timecode editing.
 
-You should always set -c when you set -t, -r, -d, if you want your output
+You should always set -c when you set -t, -r, -d, -x, if you want your output
 widely playable with video/audio in sync, especially with hardware players.
 Read about DTS compression for details.
 
