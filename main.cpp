@@ -11,7 +11,7 @@
 #ifdef _MSC_VER
 #include "getopt.h"
 #else
-#include <unistd.h>
+#include <getopt.h>
 #endif
 #include "mp4filex.h"
 #include "mp4trackx.h"
@@ -169,7 +169,6 @@ void rescaleTimecode(Option &opt)
     double delta = opt.timecodes[n-1] - opt.timecodes[n-2];
     double duration = opt.timecodes[n-1] + delta;
 
-    int timeScale = opt.timeScale;
     double scale = 1;
     double scaleMax = 0x7fffffff / duration;
     if (scaleMax < 1.0) {
@@ -236,7 +235,7 @@ void loadTimecodeV2(Option &option)
 }
 #endif
 
-void printTimeCodes(const Option &opt, const TrackEditor &track)
+void printTimeCodes(const Option &opt, TrackEditor &track)
 {
 #ifdef _WIN32
     utf8_codecvt_facet u8codec;
@@ -273,7 +272,6 @@ void execute(Option &opt)
 	file.Read(opt.src, 0);
 	std::fprintf(stderr, "Done reading\n");
 	MP4TrackId trackId = file.FindTrackId(0, MP4_VIDEO_TRACK_TYPE);
-	mp4v2::impl::MP4Atom *trackAtom = file.FindTrackAtom(trackId, 0);
 	mp4v2::impl::MP4Track *track = file.GetTrack(trackId);
 	// XXX
 	TrackEditor editor(reinterpret_cast<MP4TrackX*>(track));
