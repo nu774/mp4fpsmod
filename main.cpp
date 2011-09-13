@@ -267,7 +267,7 @@ void execute(Option &opt)
 {
     try {
 	mp4v2::impl::log.setVerbosity(MP4_LOG_NONE);
-	MP4FileX file;
+	mp4v2::impl::MP4File file;
 	std::fprintf(stderr, "Reading MP4 stream...\n");
 	file.Read(opt.src, 0);
 	std::fprintf(stderr, "Done reading\n");
@@ -308,8 +308,14 @@ void execute(Option &opt)
 	    editor.DoEditTimeCodes();
 	}
 	std::fprintf(stderr, "Saving MP4 stream...\n");
-	file.SaveTo(opt.dst);
-	std::fprintf(stderr, "Operation completed with no problem\n");
+	MP4FileCopy copier(&file);
+	copier.start(opt.dst);
+	uint64_t count = copier.getTotalChunks();
+	for (uint64_t i = 1; copier.copyNextChunk(); ++i) {
+	    std::fprintf(stderr, "\rWriting chunk %" PRId64 "/%" PRId64 "...",
+		    i, count);
+	}
+	std::fprintf(stderr, "\nOperation completed with no problem\n");
     } catch (mp4v2::impl::Exception *e) {
 	handle_mp4error(e);
     }
