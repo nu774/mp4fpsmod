@@ -40,11 +40,6 @@ namespace mp4v2 { namespace platform {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// From http://msdn.microsoft.com/en-us/library/aa365247%28v=vs.85%29.aspx#maxpath
-#define MP4V2_PATH_MAX (32767 + 1)
-
-///////////////////////////////////////////////////////////////////////////////
-
 // fprintf macros for unsigned types - mingw32 is a good source if more needed
 #define PRId8   "d"
 #define PRId16  "d"
@@ -64,6 +59,7 @@ namespace mp4v2 { namespace platform {
 ///////////////////////////////////////////////////////////////////////////////
 
 // some macros for constant expressions
+#if 0
 #define INT8_C(x)    x
 #define INT16_C(x)   x
 #define INT32_C(x)   x ## L
@@ -72,7 +68,10 @@ namespace mp4v2 { namespace platform {
 #define UINT8_C(x)   x
 #define UINT16_C(x)  x
 #define UINT32_C(x)  x ## UL
+#endif
+#ifndef UINT64_C
 #define UINT64_C(x)  x ## ULL
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -87,7 +86,9 @@ namespace mp4v2 { namespace platform {
 ///////////////////////////////////////////////////////////////////////////////
 
 #define snprintf(s,n,...)  _snprintf(s,n,__VA_ARGS__)
+#ifndef strcasecmp
 #define strcasecmp(s1,s2)  _stricmp(s1,s2)
+#endif
 #define strdup(s)          _strdup(s)
 
 ///////////////////////////////////////////////////////////////////////////////
