@@ -65,20 +65,24 @@ TrackEditor::TrackEditor(MP4TrackX *track)
     std::sort(m_ctsIndex.begin(), m_ctsIndex.end(), CTSComparator(this));
 }
 
-void TrackEditor::SetFPS(FPSRange *fpsRanges, size_t numRanges)
+void TrackEditor::SetFPS(FPSRange *fpsRanges, size_t numRanges, int timeScale)
 {
-    uint32_t timeScale = CalcTimeScale(fpsRanges, fpsRanges + numRanges);
-    uint64_t duration = CalcSampleTimes(
-	fpsRanges, fpsRanges + numRanges, timeScale);
-    if (duration > 0x7fffffff) {
-	double t = static_cast<double>(timeScale) * 0x7fffffff / duration;
-	for (timeScale = 100; timeScale < t; timeScale *= 10)
+    uint32_t scale = m_timeScale;
+    NormalizeFPSRange(fpsRanges, fpsRanges + numRanges);
+    if (timeScale == 0)
+	scale = CalcTimeScale(fpsRanges, fpsRanges + numRanges);
+    else if (timeScale > 0)
+	scale = timeScale;
+    uint64_t duration =
+	CalcSampleTimes(fpsRanges, fpsRanges + numRanges, scale);
+    if (duration > 0x7fffffff && timeScale == 0) {
+	double t = static_cast<double>(scale) * 0x7fffffff / duration;
+	for (scale = 100; scale < t; scale *= 10)
 	    ;
-	timeScale /= 10;
-	duration = CalcSampleTimes(fpsRanges, fpsRanges + numRanges,
-		timeScale);
+	scale /= 10;
+	duration = CalcSampleTimes(fpsRanges, fpsRanges + numRanges, scale);
     }
-    m_timeScale = timeScale;
+    m_timeScale = scale;
 }
 
 void
@@ -132,7 +136,7 @@ void TrackEditor::LoadCTS()
     }
 }
 
-uint32_t TrackEditor::CalcTimeScale(FPSRange *begin, const FPSRange *end)
+void TrackEditor::NormalizeFPSRange(FPSRange *begin, const FPSRange *end)
 {
     uint32_t total = 0;
     FPSRange *fp;
@@ -148,10 +152,14 @@ uint32_t TrackEditor::CalcTimeScale(FPSRange *begin, const FPSRange *end)
     if (total != m_sampleTimes.size())
 	throw std::runtime_error(
 		"Total number of frames differs from the movie");
+}
 
+uint32_t TrackEditor::CalcTimeScale(FPSRange *begin, const FPSRange *end)
+{
     int timeScale = 1;
     bool exact = true;
     int min_denom = INT_MAX;
+    FPSRange *fp;
     for (fp = begin; fp != end; ++fp) {
 	int g = gcd(fp->fps_num, fp->fps_denom);
 	fp->fps_num /= g;

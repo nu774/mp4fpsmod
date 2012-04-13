@@ -21,7 +21,9 @@ struct Option {
     bool compressDTS;
     bool optimizeTimecode;
     bool printOnly;
+    uint32_t originalTimeScale;
     uint32_t timeScale;
+    int requestedTimeScale;
     int audioDelay;
     std::vector<FPSRange> ranges;
     std::vector<double> timecodes;
@@ -34,12 +36,13 @@ struct Option {
 	compressDTS = false;
 	optimizeTimecode = false;
 	printOnly = false;
+	requestedTimeScale = 0;
 	timeScale = 1000;
 	audioDelay = 0;
     }
     bool modified() {
 	return compressDTS || audioDelay || ranges.size()
-	    || timecodes.size() || optimizeTimecode;
+	    || timecodes.size() || optimizeTimecode || requestedTimeScale > 0;
     }
 };
 
@@ -166,20 +169,28 @@ void averageTimecode(Option &opt)
 void rescaleTimecode(Option &opt)
 {
     size_t n = opt.timecodes.size();
+    if (n < 2) return;
     double delta = opt.timecodes[n-1] - opt.timecodes[n-2];
     double duration = opt.timecodes[n-1] + delta;
-
     double scale = 1;
-    double scaleMax = 0x7fffffff / duration;
-    if (scaleMax < 1.0) {
-	while (scale > scaleMax)
+
+    if (opt.requestedTimeScale == 0) {
+	double scaleMax = 0x7fffffff / duration;
+	if (scaleMax < 1.0) {
+	    while (scale > scaleMax)
+		scale /= 10.0;
+	} else if (opt.timeScale < 100) {
+	    scaleMax = std::min(scaleMax, 10000.0 / opt.timeScale);
+	    while (scale < scaleMax)
+		scale *= 10.0;
 	    scale /= 10.0;
-    } else if (opt.timeScale < 100) {
-	scaleMax = std::min(scaleMax, 10000.0 / opt.timeScale);
-	while (scale < scaleMax)
-	    scale *= 10.0;
-	scale /= 10.0;
+	}
     }
+    else if (opt.requestedTimeScale > 0)
+	scale = double(opt.requestedTimeScale) / opt.timeScale;
+    else
+	scale = double(opt.originalTimeScale) / opt.timeScale;
+
     for (size_t i = 0; i < n; ++i)
        opt.timecodes[i] *= scale;
     opt.timeScale *= scale;
@@ -201,8 +212,7 @@ void parseTimecodeV2(Option &opt, std::istream &is)
 	throw std::runtime_error("No entry in the timecode file");
     if (opt.optimizeTimecode && !is_float)
 	averageTimecode(opt);
-    if ((opt.optimizeTimecode || is_float) && opt.timecodes.size() > 1)
-	rescaleTimecode(opt);
+    rescaleTimecode(opt);
 }
 
 #ifdef _WIN32
@@ -275,6 +285,7 @@ void execute(Option &opt)
 	mp4v2::impl::MP4Track *track = file.GetTrack(trackId);
 	// XXX
 	TrackEditor editor(reinterpret_cast<MP4TrackX*>(track));
+	opt.originalTimeScale = editor.GetTimeScale();
 	if (opt.printOnly) {
 	    printTimeCodes(opt, editor);
 	    return;
@@ -283,13 +294,14 @@ void execute(Option &opt)
 	if (opt.compressDTS)
 	    editor.EnableDTSCompression(true);
 	if (opt.ranges.size())
-	    editor.SetFPS(&opt.ranges[0], opt.ranges.size());
+	    editor.SetFPS(&opt.ranges[0], opt.ranges.size(),
+		    	  opt.requestedTimeScale);
 	else if (opt.timecodeFile || opt.modified()) {
 	    if (opt.timecodeFile)
     		loadTimecodeV2(opt);
 	    else {
 		uint64_t off = editor.CTS(0);
-		opt.timeScale = editor.GetTimeScale();
+		opt.timeScale = opt.originalTimeScale;
 		for (size_t i = 0; i < editor.GetFrameCount(); ++i)
 		    opt.timecodes.push_back(editor.CTS(i) - off);
 		if (opt.optimizeTimecode)
@@ -297,7 +309,8 @@ void execute(Option &opt)
 		rescaleTimecode(opt);
 	    }
 	    if (opt.optimizeTimecode && convertToExactRanges(opt))
-		editor.SetFPS(&opt.ranges[0], opt.ranges.size());
+		editor.SetFPS(&opt.ranges[0], opt.ranges.size(),
+			      opt.requestedTimeScale);
 	    else
 		editor.SetTimeCodes(&opt.timecodes[0],
 			opt.timecodes.size(),
@@ -343,6 +356,9 @@ void usage()
 "                        For example, 25 or 30000/1001.\n"
 "  -c, --compress-dts    Enable DTS compression.\n"
 "  -d, --delay <n>       Delay audio by n millisecond.\n"
+"  -T, --timescale <keep|n>\n"
+"                        keep: Keep original timescale.\n"
+"                        n: Set timescale of videotrack to n.\n"
     , getversion());
     std::exit(1);
 }
@@ -354,6 +370,8 @@ static struct option long_options[] = {
     { "delay", required_argument, 0, 'd' },
     { "optimize", no_argument, 0, 'x' },
     { "compress-dts", no_argument, 0, 'c' },
+    { "keep-timescale", no_argument, 0, 'k' },
+    { "timescale", required_argument, 0, 'T' },
     { 0, 0, 0, 0 }
 };
 
@@ -365,7 +383,7 @@ int main1(int argc, char **argv)
 	Option option;
 	int ch;
 
-	while ((ch = getopt_long(argc, argv, "o:p:r:t:d:xcQ",
+	while ((ch = getopt_long(argc, argv, "o:p:r:t:d:T:xcQ",
 			long_options, 0)) != EOF) {
 	    if (ch == 'r') {
 		int nframes, num, denom = 1;
@@ -389,6 +407,15 @@ int main1(int argc, char **argv)
 		option.optimizeTimecode = true;
 	    } else if (ch == 'c') {
 		option.compressDTS = true;
+	    } else if (ch == 'T') {
+		if (!std::strcmp(optarg, "keep"))
+		    option.requestedTimeScale = -1;
+		else {
+		    unsigned n;
+		    if (std::sscanf(optarg, "%u", &n) != 1)
+			usage();
+		    option.requestedTimeScale = n;
+		}
 	    }
 	}
 	argc -= optind;

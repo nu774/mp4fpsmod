@@ -93,7 +93,7 @@ public:
     TrackEditor(MP4TrackX *track);
     void EnableDTSCompression(bool enable) { m_compressDTS = enable; }
     void SetAudioDelay(int delay) { m_audioDelay = delay; }
-    void SetFPS(FPSRange *fpsRanges, size_t numRanges);
+    void SetFPS(FPSRange *fpsRanges, size_t numRanges, int timeScale);
     void SetTimeCodes(double *timeCodes, size_t count, uint32_t timeScale);
     void AdjustTimeCodes();
     void DoEditTimeCodes();
@@ -114,6 +114,7 @@ private:
     }
     void LoadDTS();
     void LoadCTS();
+    void NormalizeFPSRange(FPSRange *begin, const FPSRange *end);
     uint32_t CalcTimeScale(FPSRange *begin, const FPSRange *end);
     uint64_t CalcSampleTimes(
 	    const FPSRange *begin, const FPSRange *end, uint32_t timeScale);
