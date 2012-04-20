@@ -205,8 +205,13 @@ void parseTimecodeV2(Option &opt, std::istream &is)
 	    continue;
 	double stamp;
 	if (std::strchr(line.c_str(), '.')) is_float = true;
-	if (std::sscanf(line.c_str(), "%lf", &stamp) == 1)
+	if (std::sscanf(line.c_str(), "%lf", &stamp) == 1) {
+	    if (stamp >= opt.timecodes.back()) {
+		throw std::runtime_error("Timecodes must be "
+					 "monotonic increasing");
+	    }
 	    opt.timecodes.push_back(stamp);
+	}
     }
     if (!opt.timecodes.size())
 	throw std::runtime_error("No entry in the timecode file");
