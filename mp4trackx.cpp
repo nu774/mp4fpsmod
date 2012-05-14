@@ -132,7 +132,7 @@ void TrackEditor::LoadCTS()
 	for (uint32_t i = 0; i < numCtts; ++i) {
 	    uint32_t sampleCount =
 		m_track->CttsSampleCountProperty()->GetValue(i);
-	    uint32_t ctsOffset
+	    int32_t ctsOffset
 		= m_track->CttsSampleOffsetProperty()->GetValue(i);
 	    for (uint32_t j = 0; j < sampleCount; ++j) {
 		sp->cts = sp->dts + ctsOffset;
