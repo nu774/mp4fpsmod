@@ -98,10 +98,14 @@ public:
     void AdjustTimeCodes();
     void DoEditTimeCodes();
     uint32_t GetTimeScale() const { return m_timeScale; }
-    size_t GetFrameCount() const { return m_sampleTimes.size() - 1; }
+    size_t GetFrameCount() const { return m_sampleTimes.size(); }
+    //uint64_t DTS(size_t n) const { return m_sampleTimes[n].dts; }
     uint64_t &DTS(size_t n) { return m_sampleTimes[n].dts; }
+    //uint64_t CTS(size_t n) const { return m_sampleTimes[m_ctsIndex[n]].cts; }
     uint64_t &CTS(size_t n) { return m_sampleTimes[m_ctsIndex[n]].cts; }
-    uint64_t GetMediaDuration() { return CTS(GetFrameCount()) - CTS(0); } 
+    uint64_t GetMediaDuration() {
+	return CTS(GetFrameCount()-1) * 2 - CTS(GetFrameCount()-2) - CTS(0);
+    }
 
 private:
     bool CompareByCTS(uint32_t a, uint32_t b)

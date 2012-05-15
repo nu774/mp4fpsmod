@@ -196,23 +196,17 @@ void rescaleTimecode(Option &opt)
     opt.timeScale *= scale;
 }
 
-void parseTimecodeV2(Option &opt, std::istream &is, size_t count)
+void parseTimecodeV2(Option &opt, std::istream &is)
 {
     std::string line;
     bool is_float = false;
-    size_t nent = 0;
-    while (opt.timecodes.size() < count && std::getline(is, line)) {
+    while (std::getline(is, line)) {
 	if (line.size() && line[0] == '#')
 	    continue;
 	double stamp;
 	if (std::strchr(line.c_str(), '.')) is_float = true;
-	if (std::sscanf(line.c_str(), "%lf", &stamp) == 1) {
-	    if (opt.timecodes.size() && stamp <= opt.timecodes.back()) {
-		throw std::runtime_error("Timecodes must be "
-					 "monotonic increasing");
-	    }
+	if (std::sscanf(line.c_str(), "%lf", &stamp) == 1)
 	    opt.timecodes.push_back(stamp);
-	}
     }
     if (!opt.timecodes.size())
 	throw std::runtime_error("No entry in the timecode file");
@@ -222,7 +216,7 @@ void parseTimecodeV2(Option &opt, std::istream &is, size_t count)
 }
 
 #ifdef _WIN32
-void loadTimecodeV2(Option &option, size_t count)
+void loadTimecodeV2(Option &option)
 {
     std::wstring wfname = m2w(option.timecodeFile, utf8_codecvt_facet());
 
@@ -239,15 +233,15 @@ void loadTimecodeV2(Option &option, size_t count)
     CloseHandle(fh);
 
     ss.seekg(0);
-    parseTimecodeV2(option, ss, count);
+    parseTimecodeV2(option, ss);
 }
 #else
-void loadTimecodeV2(Option &option, size_t count)
+void loadTimecodeV2(Option &option)
 {
     std::ifstream ifs(option.timecodeFile);
     if (!ifs)
 	throw std::runtime_error("Can't open timecode file");
-    parseTimecodeV2(option, ifs, count);
+    parseTimecodeV2(option, ifs);
 }
 #endif
 
@@ -304,7 +298,7 @@ void execute(Option &opt)
 		    	  opt.requestedTimeScale);
 	else if (opt.timecodeFile || opt.modified()) {
 	    if (opt.timecodeFile)
-    		loadTimecodeV2(opt, editor.GetFrameCount());
+    		loadTimecodeV2(opt);
 	    else {
 		uint64_t off = editor.CTS(0);
 		opt.timeScale = opt.originalTimeScale;

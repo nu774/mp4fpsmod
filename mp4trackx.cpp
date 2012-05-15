@@ -88,19 +88,17 @@ void TrackEditor::SetFPS(FPSRange *fpsRanges, size_t numRanges, int timeScale)
 void
 TrackEditor::SetTimeCodes(double *timeCodes, size_t count, uint32_t timeScale)
 {
-    if (count != GetFrameCount())
+    if (count != m_track->GetNumberOfSamples())
 	throw std::runtime_error(
 		"timecode entry count differs from the movie");
 
     uint64_t ioffset = 0;
     int64_t delta = 0;
-    size_t i = 0;
-    for (; i < count; ++i) {
+    for (size_t i = 0; i < count; ++i) {
 	delta = static_cast<uint64_t>(timeCodes[i] + 0.5) - ioffset;
 	ioffset += delta;
 	DTS(i) = CTS(i) = ioffset;
     }
-    DTS(i) = CTS(i) = ioffset + delta;
     m_timeScale = timeScale;
 }
 
@@ -117,16 +115,12 @@ void TrackEditor::LoadDTS()
 	    dts += sampleDelta;
 	}
     }
-    // append extra entry to keep delta of the last sample
-    SampleTime st = { dts, dts };
-    m_sampleTimes.push_back(st);
 }
 
 void TrackEditor::LoadCTS()
 {
     if (m_track->CttsCountProperty())
     {
-	uint64_t max_cts = 0;
 	uint32_t numCtts = m_track->CttsCountProperty()->GetValue();
 	SampleTime *sp = &m_sampleTimes[0];
 	for (uint32_t i = 0; i < numCtts; ++i) {
@@ -136,12 +130,9 @@ void TrackEditor::LoadCTS()
 		= m_track->CttsSampleOffsetProperty()->GetValue(i);
 	    for (uint32_t j = 0; j < sampleCount; ++j) {
 		sp->cts = sp->dts + ctsOffset;
-		if (sp->cts > max_cts) max_cts = sp->cts;
 		++sp;
 	    }
 	}
-	uint32_t delta = sp->dts - sp[-1].dts;
-	sp->cts = max_cts + delta;
     }
 }
 
@@ -153,12 +144,12 @@ void TrackEditor::NormalizeFPSRange(FPSRange *begin, const FPSRange *end)
 	if (fp->numFrames > 0)
 	    total += fp->numFrames;
 	else {
-	    fp->numFrames =
-		std::max(static_cast<int>(GetFrameCount() - total), 0);
+	    fp->numFrames = std::max(
+		static_cast<int>(m_track->GetNumberOfSamples() - total), 0);
 	    total += fp->numFrames;
 	}
     }
-    if (total != GetFrameCount())
+    if (total != m_sampleTimes.size())
 	throw std::runtime_error(
 		"Total number of frames differs from the movie");
 }
@@ -192,9 +183,8 @@ uint64_t TrackEditor::CalcSampleTimes(
 {
     double offset = 0.0;
     uint32_t frame = 0;
-    double delta = 0.0;
     for (const FPSRange *fp = begin; fp != end; ++fp) {
-	delta = fps2tsdelta(fp->fps_num, fp->fps_denom, timeScale);
+	double delta = fps2tsdelta(fp->fps_num, fp->fps_denom, timeScale);
 	for (uint32_t i = 0; i < fp->numFrames; ++i) {
 	    uint64_t ioffset = static_cast<uint64_t>(offset + 0.5);
 	    DTS(frame) = CTS(frame) = ioffset;
@@ -202,16 +192,15 @@ uint64_t TrackEditor::CalcSampleTimes(
 	    ++frame;
 	}
     }
-    DTS(frame) = CTS(frame) = offset + 0.5;
-    return DTS(frame);
+    return static_cast<uint64_t>(offset + 0.5);
 }
 
 int64_t TrackEditor::CalcInitialDelay()
 {
     int64_t maxdiff = 0;
     std::vector<SampleTime>::iterator is;
-    for (size_t i = 0; i < GetFrameCount(); ++i) {
-	int64_t diff = m_sampleTimes[i].dts - m_sampleTimes[i].cts;
+    for (is = m_sampleTimes.begin(); is != m_sampleTimes.end(); ++is) {
+	int64_t diff = is->dts - is->cts;
 	if (diff > maxdiff) maxdiff = diff;
     }
     return maxdiff;
@@ -226,18 +215,20 @@ const double TC_COMPRESS_SCALE_MIN = 0.5;
 template <typename TimeCode>
 void TrackEditor::CompressTimeCodes(int64_t offset, TimeCode timeCode)
 {
+    if (!GetFrameCount())
+	return;
     size_t n = 0;
     double off = timeCode(1);
     double scale = std::max((off / (offset + off)), TC_COMPRESS_SCALE_MIN);
     int64_t prev = 0;
-    for (n = 1; n < m_sampleTimes.size(); ++n) {
+    for (n = 1; n < GetFrameCount(); ++n) {
 	int64_t orig = timeCode(n);
 	if (orig - offset >= prev + (off * scale)) break;
 	int64_t cur = orig * scale + 0.5;
 	if (cur == prev) ++cur;
 	timeCode(n) = prev = cur;
     }
-    for (size_t i = n; i < m_sampleTimes.size(); ++i)
+    for (size_t i = n; i < GetFrameCount(); ++i)
 	timeCode(i) -= offset;
 }
 
@@ -246,6 +237,8 @@ const double TC_DELAY_SCALE = 4.0;
 template <typename TimeCode>
 void TrackEditor::DelayTimeCodes(int64_t offset, TimeCode timeCode)
 {
+    if (!GetFrameCount())
+	return;
     size_t n = 0;
     double off = timeCode(1);
     double factor = 2.0;
@@ -255,22 +248,22 @@ void TrackEditor::DelayTimeCodes(int64_t offset, TimeCode timeCode)
 	factor += 1.0;
     } while (scale > TC_DELAY_SCALE);
     int64_t prev = 0;
-    for (n = 1; n < m_sampleTimes.size(); ++n) {
+    for (n = 1; n < GetFrameCount(); ++n) {
 	int64_t orig = timeCode(n);
 	int64_t cur = orig * scale + 0.5;
 	if (cur >= orig + offset)
 	    break;
 	timeCode(n) = prev = cur;
     }
-    for (size_t i = n; i < m_sampleTimes.size(); ++i)
+    for (size_t i = n; i < GetFrameCount(); ++i)
 	timeCode(i) += offset;
 }
 
 void TrackEditor::OffsetCTS(int64_t off)
 {
     std::vector<SampleTime>::iterator is;
-    for (size_t i = 0; i < m_sampleTimes.size(); ++i)
-	m_sampleTimes[i].cts += off;
+    for (is = m_sampleTimes.begin(); is != m_sampleTimes.end(); ++is)
+	is->cts += off;
 }
 
 void TrackEditor::AdjustTimeCodes()
@@ -355,17 +348,19 @@ void TrackEditor::UpdateStts()
     m_track->SttsSampleCountProperty()->SetCount(0);
     m_track->SttsSampleDeltaProperty()->SetCount(0);
     
+    uint64_t prev_dts = 0;
     int32_t prev_delta = -1;
     size_t sttsIndex = -1;
-    for (size_t i = 0; i < GetFrameCount(); ++i) {
-	int32_t delta =
-	    static_cast<int32_t>(m_sampleTimes[i+1].dts - m_sampleTimes[i].dts);
+    std::vector<SampleTime>::iterator is;
+    for (is = ++m_sampleTimes.begin(); is != m_sampleTimes.end(); ++is) {
+	int32_t delta = static_cast<int32_t>(is->dts - prev_dts);
 	if (delta != prev_delta) {
 	    ++sttsIndex;
 	    m_track->SttsCountProperty()->IncrementValue();
 	    m_track->SttsSampleCountProperty()->AddValue(0);
 	    m_track->SttsSampleDeltaProperty()->AddValue(delta);
 	}
+	prev_dts = is->dts;
 	prev_delta = delta;
 	m_track->SttsSampleCountProperty()->IncrementValue(1, sttsIndex);
     }
@@ -382,8 +377,9 @@ void TrackEditor::UpdateCtts()
 
     int32_t offset = -1;
     size_t cttsIndex = -1;
-    for (size_t i = 0; i < GetFrameCount(); ++i) {
-	int32_t ctsoff = m_sampleTimes[i].cts - m_sampleTimes[i].dts;
+    std::vector<SampleTime>::const_iterator is;
+    for (is = m_sampleTimes.begin(); is != m_sampleTimes.end(); ++is) {
+	int32_t ctsoff = is->cts - is->dts;
 	if (ctsoff != offset) {
 	    offset = ctsoff;
 	    ++cttsIndex;
