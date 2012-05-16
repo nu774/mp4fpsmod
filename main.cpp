@@ -90,7 +90,6 @@ bool convertToExactRanges(Option &opt)
 	    return false;
 	prev = *dp;
     }
-    ++ranges.back().numFrames;
     std::fprintf(stderr, "Converted to exact fps ranges\n");
     for (size_t i = 0; i < ranges.size(); ++i) {
 	std::fprintf(stderr, "%d frames: fps %d/%d\n",
@@ -196,11 +195,11 @@ void rescaleTimecode(Option &opt)
     opt.timeScale *= scale;
 }
 
-void parseTimecodeV2(Option &opt, std::istream &is)
+void parseTimecodeV2(Option &opt, std::istream &is, size_t count)
 {
     std::string line;
     bool is_float = false;
-    while (std::getline(is, line)) {
+    while (opt.timecodes.size() < count && std::getline(is, line)) {
 	if (line.size() && line[0] == '#')
 	    continue;
 	double stamp;
@@ -210,13 +209,18 @@ void parseTimecodeV2(Option &opt, std::istream &is)
     }
     if (!opt.timecodes.size())
 	throw std::runtime_error("No entry in the timecode file");
+    if (opt.timecodes.size() == count -1 && opt.timecodes.size() >= 2) {
+	double last = opt.timecodes[opt.timecodes.size()-1];
+	double prev = opt.timecodes[opt.timecodes.size()-2];
+	opt.timecodes.push_back(last * 2 - prev);
+    }
     if (opt.optimizeTimecode && !is_float)
 	averageTimecode(opt);
     rescaleTimecode(opt);
 }
 
 #ifdef _WIN32
-void loadTimecodeV2(Option &option)
+void loadTimecodeV2(Option &option, size_t count)
 {
     std::wstring wfname = m2w(option.timecodeFile, utf8_codecvt_facet());
 
@@ -233,15 +237,15 @@ void loadTimecodeV2(Option &option)
     CloseHandle(fh);
 
     ss.seekg(0);
-    parseTimecodeV2(option, ss);
+    parseTimecodeV2(option, ss, count);
 }
 #else
-void loadTimecodeV2(Option &option)
+void loadTimecodeV2(Option &option, size_t count)
 {
     std::ifstream ifs(option.timecodeFile);
     if (!ifs)
 	throw std::runtime_error("Can't open timecode file");
-    parseTimecodeV2(option, ifs);
+    parseTimecodeV2(option, ifs, count);
 }
 #endif
 
@@ -298,11 +302,11 @@ void execute(Option &opt)
 		    	  opt.requestedTimeScale);
 	else if (opt.timecodeFile || opt.modified()) {
 	    if (opt.timecodeFile)
-    		loadTimecodeV2(opt);
+    		loadTimecodeV2(opt, editor.GetFrameCount() + 1);
 	    else {
 		uint64_t off = editor.CTS(0);
 		opt.timeScale = opt.originalTimeScale;
-		for (size_t i = 0; i < editor.GetFrameCount(); ++i)
+		for (size_t i = 0; i < editor.GetFrameCount() + 1; ++i)
 		    opt.timecodes.push_back(editor.CTS(i) - off);
 		if (opt.optimizeTimecode)
 		    averageTimecode(opt);
