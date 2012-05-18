@@ -27,6 +27,7 @@ struct Option {
     int audioDelay;
     std::vector<FPSRange> ranges;
     std::vector<double> timecodes;
+    std::vector<std::pair<size_t, double> > averages;
 
     Option()
     {
@@ -52,6 +53,7 @@ bool convertToExactRanges(Option &opt)
 	double delta;
 	int num, denom;
     } wellKnown[] = {
+	{ 0, 18000, 1001 },
 	{ 0, 24000, 1001 },
 	{ 0, 25, 1 },
 	{ 0, 30000, 1001 },
@@ -63,32 +65,21 @@ bool convertToExactRanges(Option &opt)
 	sp->delta = static_cast<double>(sp->denom) / sp->num * opt.timeScale;
 
     std::vector<FPSRange> ranges;
-    double prev = opt.timecodes[0];
-    for (std::vector<double>::const_iterator dp = ++opt.timecodes.begin();
-	    dp != opt.timecodes.end(); ++dp) {
-	double delta = *dp - prev;
+    std::vector<std::pair<size_t, double> >::const_iterator dp;
+    for (dp = opt.averages.begin(); dp != opt.averages.end(); ++dp) {
+	double delta = dp->second;
+	double bound = std::max(1.0 / dp->first, 0.00048828125);
 	for (sp = wellKnown; sp != spEnd; ++sp) {
 	    /* test if it's close enough to one of the well known rate. */
 	    double diff = std::abs(delta - sp->delta);
-	    if (diff / delta < 0.00048828125) {
-		if (ranges.size() && ranges.back().fps_num == sp->num)
-		    ++ranges.back().numFrames;
-		else {
-		    FPSRange range = { 1, sp->num, sp->denom };
-		    ranges.push_back(range);
-		}
-		if (sp != wellKnown) {
-		    /* move matched spec to the first position */
-		    FPSSpec tmp = *sp;
-		    *sp = wellKnown[0];
-		    wellKnown[0] = tmp;
-		}
+	    if (diff < bound) {
+		FPSRange range = { dp->first, sp->num, sp->denom };
+		ranges.push_back(range);
 		break;
 	    }
 	}
 	if (sp == spEnd)
 	    return false;
-	prev = *dp;
     }
     std::fprintf(stderr, "Converted to exact fps ranges\n");
     for (size_t i = 0; i < ranges.size(); ++i) {
@@ -133,35 +124,34 @@ void averageTimecode(Option &opt)
 {
     std::vector<double> &tc = opt.timecodes;
     std::vector<int> deltas;
-    double prev = tc[0];
+    int prev = tc[0] + 0.5;
     for (std::vector<double>::const_iterator ii = ++tc.begin();
 	    ii != tc.end(); ++ii) {
-	deltas.push_back(static_cast<int>(*ii - prev));
-	prev = *ii;
+	deltas.push_back(*ii - prev + 0.5);
+	prev = *ii + 0.5;
     }
 
     std::vector<std::vector<int> > groups;
     groupbyAdjacent(deltas.begin(), deltas.end(), &groups);
 
-    std::vector<double> averages;
     for (std::vector<std::vector<int> >::const_iterator kk = groups.begin();
 	    kk != groups.end(); ++kk) {
 	uint64_t sum = std::accumulate(kk->begin(), kk->end(), 0ULL);
 	double average = static_cast<double>(sum) / kk->size();
-	averages.push_back(average);
+	opt.averages.push_back(std::make_pair(kk->size(), average));
     }
     std::fprintf(stderr, "Divided into %d group%s\n",
 	    groups.size(), (groups.size() == 1) ? "" : "s");
-    for (size_t i = 0; i < groups.size(); ++i) {
+    for (size_t i = 0; i < opt.averages.size(); ++i) {
 	std::fprintf(stderr, "%d frames: time delta %g\n",
-		groups[i].size(), averages[i]);
+		opt.averages[i].first, opt.averages[i].second);
     }
 
     tc.clear();
     tc.push_back(0.0);
     for (size_t i = 0; i < groups.size(); ++i) {
 	for (size_t j = 0; j < groups[i].size(); ++j)
-	    tc.push_back(tc.back() + averages[i]);
+	    tc.push_back(tc.back() + opt.averages[i].second);
     }
 }
 
@@ -214,9 +204,8 @@ void parseTimecodeV2(Option &opt, std::istream &is, size_t count)
 	double prev = opt.timecodes[opt.timecodes.size()-2];
 	opt.timecodes.push_back(last * 2 - prev);
     }
-    if (opt.optimizeTimecode && !is_float)
+    if (opt.optimizeTimecode)
 	averageTimecode(opt);
-    rescaleTimecode(opt);
 }
 
 #ifdef _WIN32
@@ -310,15 +299,16 @@ void execute(Option &opt)
 		    opt.timecodes.push_back(editor.CTS(i) - off);
 		if (opt.optimizeTimecode)
 		    averageTimecode(opt);
-		rescaleTimecode(opt);
 	    }
 	    if (opt.optimizeTimecode && convertToExactRanges(opt))
 		editor.SetFPS(&opt.ranges[0], opt.ranges.size(),
 			      opt.requestedTimeScale);
-	    else
+	    else {
+		rescaleTimecode(opt);
 		editor.SetTimeCodes(&opt.timecodes[0],
 			opt.timecodes.size(),
 			opt.timeScale);
+	    }
 	}
 	if (opt.modified()) {
 	    editor.AdjustTimeCodes();
