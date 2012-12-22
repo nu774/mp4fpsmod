@@ -11,8 +11,8 @@ class MP4FileX: public mp4v2::impl::MP4File {
 
 class MP4FileCopy {
     struct ChunkInfo {
-	mp4v2::impl::MP4ChunkId current, final;
-	MP4Timestamp time;
+        mp4v2::impl::MP4ChunkId current, final;
+        MP4Timestamp time;
     };
     MP4FileX *m_mp4file;
     uint64_t m_nchunks;

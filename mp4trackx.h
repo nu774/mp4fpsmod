@@ -23,64 +23,64 @@ public:
     void RebuildMdhd();
 
     void UpdateDurationsX(MP4Duration duration) {
-	return UpdateDurations(duration);
+        return UpdateDurations(duration);
     }
     MP4Duration ToMovieDurationX(MP4Duration trackDuration) {
-	return ToMovieDuration(trackDuration);
+        return ToMovieDuration(trackDuration);
     }
     void UpdateModificationTimesX() {
-	return UpdateModificationTimes();
+        return UpdateModificationTimes();
     }
 
     mp4v2::impl::MP4Integer32Property*& TimeScaleProperty() {
-	return m_pTimeScaleProperty;
+        return m_pTimeScaleProperty;
     }
     mp4v2::impl::MP4IntegerProperty* TrackDurationProperty() {
-	return m_pTrackDurationProperty;
+        return m_pTrackDurationProperty;
     }
     mp4v2::impl::MP4IntegerProperty*& MediaDurationProperty() {
-	return m_pMediaDurationProperty;
+        return m_pMediaDurationProperty;
     }
     mp4v2::impl::MP4IntegerProperty*& MediaModificationProperty() {
-	return m_pMediaModificationProperty;
+        return m_pMediaModificationProperty;
     }
     mp4v2::impl::MP4Integer32Property* SttsCountProperty() {
-	return m_pSttsCountProperty;
+        return m_pSttsCountProperty;
     }
     mp4v2::impl::MP4Integer32Property* SttsSampleCountProperty() {
-	return m_pSttsSampleCountProperty;
+        return m_pSttsSampleCountProperty;
     }
     mp4v2::impl::MP4Integer32Property* SttsSampleDeltaProperty() {
-	return m_pSttsSampleDeltaProperty;
+        return m_pSttsSampleDeltaProperty;
     }
     mp4v2::impl::MP4Integer32Property* CttsCountProperty() {
-	return m_pCttsCountProperty;
+        return m_pCttsCountProperty;
     }
     mp4v2::impl::MP4Integer32Property* CttsSampleCountProperty() {
-	return m_pCttsSampleCountProperty;
+        return m_pCttsSampleCountProperty;
     }
     mp4v2::impl::MP4Integer32Property* CttsSampleOffsetProperty() {
-	return m_pCttsSampleOffsetProperty;
+        return m_pCttsSampleOffsetProperty;
     }
     mp4v2::impl::MP4Integer32Property* ElstCountProperty() {
-	return m_pElstCountProperty;
+        return m_pElstCountProperty;
     }
     mp4v2::impl::MP4IntegerProperty* ElstMediaTimeProperty() {
-	return m_pElstMediaTimeProperty;
+        return m_pElstMediaTimeProperty;
     }
     mp4v2::impl::MP4IntegerProperty* ElstDurationProperty() {
-	return m_pElstDurationProperty;
+        return m_pElstDurationProperty;
     }
 };
 
 class TrackEditor {
     struct CTSComparator {
-	TrackEditor *owner_;
-	CTSComparator(TrackEditor *owner): owner_(owner) {}
-	bool operator()(uint32_t a, uint32_t b)
-	{
-	    return owner_->CompareByCTS(a, b);
-	}
+        TrackEditor *owner_;
+        CTSComparator(TrackEditor *owner): owner_(owner) {}
+        bool operator()(uint32_t a, uint32_t b)
+        {
+            return owner_->CompareByCTS(a, b);
+        }
     };
     MP4TrackX *m_track;
     std::vector<SampleTime> m_sampleTimes;
@@ -106,14 +106,14 @@ public:
 private:
     bool CompareByCTS(uint32_t a, uint32_t b)
     {
-	return m_sampleTimes[a].cts < m_sampleTimes[b].cts;
+        return m_sampleTimes[a].cts < m_sampleTimes[b].cts;
     }
     void LoadDTS();
     void LoadCTS();
     void NormalizeFPSRange(FPSRange *begin, const FPSRange *end);
     uint32_t CalcTimeScale(FPSRange *begin, const FPSRange *end);
     uint64_t CalcSampleTimes(
-	    const FPSRange *begin, const FPSRange *end, uint32_t timeScale);
+            const FPSRange *begin, const FPSRange *end, uint32_t timeScale);
     template <typename TimeCode>
     void DelayTimeCodes(int64_t offset, TimeCode timeCode);
     template <typename TimeCode>
@@ -125,7 +125,7 @@ private:
     void UpdateElst(MP4TrackX *track, int64_t mediaTime);
     int64_t GetAudioDelayInTimeScale()
     {
-	return m_audioDelay / 1000.0 * m_timeScale;
+        return m_audioDelay / 1000.0 * m_timeScale;
     }
 };
 
