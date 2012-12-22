@@ -189,13 +189,21 @@ void parseTimecodeV2(Option &opt, std::istream &is, size_t count)
 {
     std::string line;
     bool is_float = false;
+    size_t nline = 0;
     while (opt.timecodes.size() < count && std::getline(is, line)) {
+	++nline;
 	if (line.size() && line[0] == '#')
 	    continue;
 	double stamp;
 	if (std::strchr(line.c_str(), '.')) is_float = true;
-	if (std::sscanf(line.c_str(), "%lf", &stamp) == 1)
+	if (std::sscanf(line.c_str(), "%lf", &stamp) == 1) {
+	    if (opt.timecodes.size() && stamp <= opt.timecodes.back()) {
+		std::stringstream msg;
+		msg << "Timecode is not monotone increasing! at line " << nline;
+		throw std::runtime_error(msg.str());
+	    }
 	    opt.timecodes.push_back(stamp);
+	}
     }
     if (!opt.timecodes.size())
 	throw std::runtime_error("No entry in the timecode file");
@@ -269,6 +277,7 @@ void printTimeCodes(const Option &opt, TrackEditor &track)
 void execute(Option &opt)
 {
     try {
+	//mp4v2::impl::log.setVerbosity(MP4_LOG_VERBOSE3);
 	mp4v2::impl::log.setVerbosity(MP4_LOG_NONE);
 	mp4v2::impl::MP4File file;
 	std::fprintf(stderr, "Reading MP4 stream...\n");
