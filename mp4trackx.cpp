@@ -393,8 +393,8 @@ void TrackEditor::UpdateElst(MP4TrackX *track, int64_t mediaTime)
     int64_t duration = track->TrackDurationProperty()->GetValue();
     if (track->ElstCountProperty()) {
         size_t count = track->ElstCountProperty()->GetValue();
-        for (size_t i = 0; i < count; ++i)
-            track->DeleteEdit(i + 1);
+        for (size_t i = count; i > 0; --i)
+            track->DeleteEdit(i);
     }
     if (mediaTime) {
         track->AddEdit();
