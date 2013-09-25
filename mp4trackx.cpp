@@ -1,5 +1,6 @@
 #include <vector>
 #include <algorithm>
+#include <functional>
 #include "mp4trackx.h"
 
 using mp4v2::impl::MP4File;
