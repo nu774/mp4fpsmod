@@ -1,0 +1,23 @@
+Source: mp4fpsmod
+Section: sound
+Priority: optional
+Maintainer: nu774 <honeycomb77@gmail.com>
+Uploaders: Marshall Banana <djcj@gmx.de>
+Homepage: https://github.com/nu774/mp4fpsmod
+Standards-Version: 3.9.4
+Build-Depends:
+ debhelper (>= 9),
+ dh-autoreconf,
+ autoconf,
+ automake
+Vcs-Git: https://github.com/nu774/mp4fpsmod.git
+Vcs-Browser: https://github.com/nu774/mp4fpsmod
+
+Package: mp4fpsmod
+Architecture: any
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends}
+Description: mp4 time code editor
+ Tiny mp4 time code editor. You can use this for changing fps, delaying
+ audio tracks, executing DTS compression, extracting time codes of mp4.

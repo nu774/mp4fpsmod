@@ -1,0 +1,285 @@
+.\" manpage was created with the following commands and then manually edited:
+.\" pandoc -s -f markdown -t man ../README.rst > README.1
+.\" help2man -n "mp4 time code editor" -N -s1 --no-discard-stderr ../mp4fpsmod > mp4fpsmod.1
+.\"
+.TH MP4FPSMOD: "1" "March 2014" "0.24" "User Commands"
+.SH NAME
+mp4fpsmod: \- mp4 time code editor
+.SH DESCRIPTION
+usage: mp4fpsmod [options] FILE
+.TP
+\fB\-o\fR <file>
+Specify MP4 output filename.
+.TP
+\fB\-p\fR, \fB\-\-print\fR <file>
+Output current timecodes into timecode\-v2 format.
+.TP
+\fB\-t\fR, \fB\-\-tcfile\fR <file>
+Edit timecodes with timecode\-v2 file.
+.TP
+\fB\-x\fR, \fB\-\-optimize\fR
+Optimize timecode
+.TP
+\fB\-r\fR, \fB\-\-fps\fR <nframes:fps>
+Edit timecodes with the spec.
+You can specify \fB\-r\fR more than two times, to produce
+VFR movie.
+"nframes" is number of frames, which "fps" is
+aplied to.
+0 as nframes means "rest of the movie"
+"fps" is a rational or integer.
+For example, 25 or 30000/1001.
+.TP
+\fB\-c\fR, \fB\-\-compress\-dts\fR
+Enable DTS compression.
+.TP
+\fB\-d\fR, \fB\-\-delay\fR <n>
+Delay audio by n millisecond.
+.TP
+\fB\-T\fR, \fB\-\-timescale\fR <keep|n>
+keep: Keep original timescale.
+n: Set timescale of videotrack to n.
+.PP
+.PP
+========= mp4fpsmod =========
+.SS What is this?
+.PP
+Tiny mp4 time code editor.
+You can use this for changing fps, delaying audio tracks, executing DTS
+compression, extracting time codes of mp4.
+.SS Example
+.PP
+Read foo.mp4, change fps to 25, and save to bar.mp4::
+.IP
+.nf
+\f[C]
+mp4fpsmod\ \-r\ 0:25\ \-o\ bar.mp4\ foo.mp4
+\f[]
+.fi
+.PP
+Read foo.mp4, change fps of first 300 frames to 30000/1001, next 600
+frames to 24000/1001, and rest of the movie to 30000/1001 (producing VFR
+movie)::
+.IP
+.nf
+\f[C]
+mp4fpsmod\ \-r\ 300:30000/1001\ \-r\ 600:24000/1001\ \-r\ 0:30000/1001\ \-o\ bar.mp4\ foo.mp4
+\f[]
+.fi
+.PP
+Edit timecodes of foo.mp4 with timecode_v2 described in timecode.txt,
+and save to bar.mp4::
+.IP
+.nf
+\f[C]
+mp4fpsmod\ \-t\ timecode.txt\ foo.mp4\ \-o\ bar.mp4
+\f[]
+.fi
+.PP
+Same as above example, with DTS compression enabled and timecodes
+optimization::
+.IP
+.nf
+\f[C]
+mp4fpsmod\ \-t\ timecode.txt\ \-x\ \-c\ foo.mp4\ \-o\ bar.mp4
+\f[]
+.fi
+.PP
+Read timecodes of foo.mp4 and save to timecode.txt::
+.IP
+.nf
+\f[C]
+mp4fpsmod\ \-p\ timecode.txt\ foo.mp4
+\f[]
+.fi
+.PP
+Execute DTS compression, and save to bar.mp4::
+.IP
+.nf
+\f[C]
+mp4fpsmod\ \-c\ foo.mp4\ \-o\ bar.mp4
+\f[]
+.fi
+.PP
+Delay audio by 100ms using edts/elst::
+.IP
+.nf
+\f[C]
+mp4fpsmod\ \-d\ 100\ foo.mp4\ \-o\ bar.mp4
+\f[]
+.fi
+.PP
+Delay audio by \-200ms using DTS/CTS shifting::
+.IP
+.nf
+\f[C]
+mp4fpsmod\ \-d\ \-200\ \-c\ foo.mp4\ \-o\ bar.mp4
+\f[]
+.fi
+.SS Usage
+.PP
+:: \-o Specify MP4 output filename.
+\-p, \-\-print Output current timecodes into timecode\-v2 format.
+\-t, \-\-tcfile Edit timecodes with timecode\-v2 file.
+\-x, \-\-optimize Optimize timecode \-r, \-\-fps Edit timecodes with the
+spec.
+You can specify \-r more than two times, to produce VFR movie.
+"nframes" is number of frames, which "fps" is aplied to.
+0 as nframes means "rest of the movie" "fps" is a rational or integer.
+For example, 25 or 30000/1001.
+\-c, \-\-compress\-dts Enable DTS compression.
+\-d, \-\-delay Delay audio by n millisecond.
+.PP
+In any cases, the original mp4 is kept as it is (not touched).
+\-o is required except when you specify \-p.
+On the other hand, when you specify \-p, other options are ignored.
+.PP
+\-t and \-r are exclusive, and cannot be set both at the same time.
+\-c, \-d, \-x can be set standalone, or with \-t or \-r.
+.PP
+When you specify one of \-t, \-r, \-x, \-c, \-d, timecode is
+edited/rewritten.
+Otherwise without \-p, input is just copied with moov\->mdat order,
+without timecode editing.
+.PP
+You should always set \-c when you set \-t, \-r, \-d, \-x, if you want
+your output widely playable with video/audio in sync, especially with
+hardware players.
+Read about DTS compression for details.
+.PP
+Beware that mp4fpsmod ignores edts/elst of input, and when timecode is
+edited, edts/elst of video/audio tracks are deleted, and re\-inserted as
+needed.
+Therefore, if the input has already some audio delays, you have to
+always specify it with \-d.
+.SS About timecode optimization
+.PP
+Consider timecode file like this::
+.PP
+# timecode format v2 0 33 67 100 133 167 200 :
+.PP
+This is the example of timecodes for 30000/1001 fps movie.
+.PD 0
+.P
+.PD
+In this case, each timeDelta of entries are 33, 34, 33, 33, 34, 33...
+.PP
+When \-x option is given, and when timecodes are integer values,
+mp4fpsmod tries to divide timecodes into groups, whose entries have time
+delta very close to each other.
+Then, average each group\[aq]s time delta into one floating point value.
+.PP
+mp4fpsmod also tries to do further optimization when \-x option
+specified.
+If every timeDelta of frames looks like close enough to one of the well
+known NTSC or PAL rate, mp4fpsmod takes the latter, and do the exact
+math, instead of floating point calcuration.
+.PP
+You can control these behaviors by \-x option.
+Without \-x, literal values in the timecodes_v2 file will be used.
+.SS About DTS Compression
+.PP
+By default, mp4fpsmod produces rather straightforward DTS.
+For example, when you specify \-r 300:30000/1001 \-r400 24000/1001,
+.IP \[bu] 2
+TimeScale is set to 120000, which is LCM of 30000 and 24000
+.IP \[bu] 2
+DTS is like 0, 4004, 8008,...
+for first 300 frames.
+For next 400 frames, DTS delta is 5005.
+.IP \[bu] 2
+CTS is like DTS, except that it is arranged in the composition order,
+instead of decoding/frame order.
+.PP
+In the mp4 container, stts box(which holds DTS delta) will look like
+this::
+.IP
+.nf
+\f[C]
+<TimeToSampleEntry\ SampleDelta="4004"\ SampleCount="300"/>
+<TimeToSampleEntry\ SampleDelta="5005"\ SampleCount="400"/>
+\f[]
+.fi
+.PP
+Timecodes of this movie will be something like this, if B\-frame is
+used::
+.IP
+.nf
+\f[C]
+\-\-\-\-\-\-\-\-\-\-\-\-\ \-\-\-\-\-\-\-\-
+DTS\ \ \ \ \ \ \ \ \ \ CTS
+\-\-\-\-\-\-\-\-\-\-\-\-\ \-\-\-\-\-\-\-\-
+0\ \ \ \ \ \ \ \ \ \ \ \ 0(I)
+4004\ \ \ \ \ \ \ \ \ 12012(P)
+8008\ \ \ \ \ \ \ \ \ 4004(B)
+12012\ \ \ \ \ \ \ \ 8008(B)
+16016\ \ \ \ \ \ \ \ 24024(P)
+20020\ \ \ \ \ \ \ \ 16016(B)
+\-\-\-\-\-\-\-\-\-\-\-\-\ \-\-\-\-\-\-\-\-
+\f[]
+.fi
+.PP
+However, this doesn\[aq]t satisfy DTS <= CTS, for some frames.
+Therefore, we have to shift(delay) CTS.
+Finally, we get::
+.IP
+.nf
+\f[C]
+\-\-\-\-\-\-\-\-\-\-\-\-\ \-\-\-\-\-
+DTS\ \ \ \ \ \ \ \ \ \ CTS
+\-\-\-\-\-\-\-\-\-\-\-\-\ \-\-\-\-\-
+0\ \ \ \ \ \ \ \ \ \ \ \ 4004
+4004\ \ \ \ \ \ \ \ \ 16016
+8008\ \ \ \ \ \ \ \ \ 8008
+12012\ \ \ \ \ \ \ \ 12012
+16016\ \ \ \ \ \ \ \ 28028
+20020\ \ \ \ \ \ \ \ 20020
+\-\-\-\-\-\-\-\-\-\-\-\-\ \-\-\-\-\-
+\f[]
+.fi
+.PP
+As you can see, CTS of first frame is non\-zero value, therefore has
+delay of 4004, in timescale unit.
+This delay value is, by default, saved into edts/elst box.
+If your player handles edts/elst properly, this is fine.
+However, there\[aq]s many players in the wild, which lacks edts support.
+If you are using them, you might find video/audio out of sync.
+.PP
+DTS compression comes for this reason.
+If you enable DTS compression with "\-c" option, mp4fpsmod produces
+smaller DTS at beginning, and minimizes the CTS delay without the help
+of edts/elst box.
+With DTS compression, DTS and CTS will be something like this::
+.IP
+.nf
+\f[C]
+\-\-\-\-\-\-\-\-\-\-\-\ \-\-\-\-\-
+DTS\ \ \ \ \ \ \ \ \ \ CTS
+\-\-\-\-\-\-\-\-\-\-\-\ \-\-\-\-\-
+0\ \ \ \ \ \ \ \ \ \ \ 0
+2002\ \ \ \ \ \ \ \ 12012
+4004\ \ \ \ \ \ \ \ 4004
+8008\ \ \ \ \ \ \ \ 8008
+12012\ \ \ \ \ \ \ 24024
+16016\ \ \ \ \ \ \ 16016
+\-\-\-\-\-\-\-\-\-\-\-\ \-\-\-\-\-
+\f[]
+.fi
+.SS About audio delay
+.PP
+You can specify audio delay with \-d option.
+Delay is in milliseconds, and both positive and negative values are
+valid.
+.PP
+When you don\[aq]t enable DTS compression with \-c, delay is just
+achieved with edts/elst setting.
+If positive, video track\[aq]s edts is set.
+Otherwise, each audio track\[aq]s edts is set.
+.PP
+When you enable DTS compression, DTS/CTS are directly shifted to reflect
+the delay.
+When delay is positive, smaller DTS/CTS are assigned for the beginning
+of movie, so that video plays faster and audio is delayed, until it
+reaches the specified delay time.
+Negative delay is achieved mostly like the positive case, except that
+bigger DTS/CTS are used, and video plays slower.
