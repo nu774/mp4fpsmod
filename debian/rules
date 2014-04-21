@@ -6,5 +6,5 @@
 override_dh_auto_build:
 	cd mp4v2 && ./make_configure
 	cd mp4v2 && ./configure --enable-shared=no --disable-util
-	cd mp4v2 && make
-	make LIBPATH=-L./mp4v2/.libs
+	cd mp4v2 && $(MAKE)
+	$(MAKE) LIBPATH=-L./mp4v2/.libs

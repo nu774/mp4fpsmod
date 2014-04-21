@@ -2,11 +2,15 @@
 .\" pandoc -s -f markdown -t man ../README.rst > README.1
 .\" help2man -n "mp4 time code editor" -N -s1 --no-discard-stderr ../mp4fpsmod > mp4fpsmod.1
 .\"
-.TH MP4FPSMOD: "1" "March 2014" "0.24" "User Commands"
+.TH MP4FPSMOD "1" "March 2014" "0.24" "User Commands"
 .SH NAME
-mp4fpsmod: \- mp4 time code editor
+mp4fpsmod \- Tiny mp4 time code editor
 .SH DESCRIPTION
 usage: mp4fpsmod [options] FILE
+.PP
+You can use this for changing fps, delaying audio tracks, executing DTS
+compression, extracting time codes of mp4.
+.PP
 .TP
 \fB\-o\fR <file>
 Specify MP4 output filename.
@@ -41,12 +45,6 @@ keep: Keep original timescale.
 n: Set timescale of videotrack to n.
 .PP
 .PP
-========= mp4fpsmod =========
-.SS What is this?
-.PP
-Tiny mp4 time code editor.
-You can use this for changing fps, delaying audio tracks, executing DTS
-compression, extracting time codes of mp4.
 .SS Example
 .PP
 Read foo.mp4, change fps to 25, and save to bar.mp4::
@@ -283,3 +281,13 @@ of movie, so that video plays faster and audio is delayed, until it
 reaches the specified delay time.
 Negative delay is achieved mostly like the positive case, except that
 bigger DTS/CTS are used, and video plays slower.
+.SH AUTHORS
+nu774 <honeycomb77@gmail.com>
+.SH "SEE ALSO"
+.BR mp4art (1),
+.BR mp4file (1),
+.BR mp4subtitle (1),
+.BR mp4track (1),
+.BR GPAC (1),
+.BR MP4Box (1),
+.BR MP4Client (1)
