@@ -15,6 +15,7 @@
 #endif
 #include "mp4filex.h"
 #include "mp4trackx.h"
+#include "mp4v2/include/mp4v2/project.h"
 
 struct Option {
     const char *src, *dst, *timecodeFile;
@@ -343,6 +344,7 @@ void usage()
 {
     std::fprintf(stderr,
 "mp4fpsmod %s\n"
+"(libmp4v2 " MP4V2_PROJECT_version ")\n"
 "usage: mp4fpsmod [options] FILE\n"
 "  -o <file>             Specify MP4 output filename.\n"
 "  -p, --print <file>    Output current timecodes into timecode-v2 format.\n"
