@@ -5,9 +5,10 @@ Source: https://github.com/nu774/mp4fpsmod
 
 
 Files: src/*
+Copyright: public-domain
 License: public-domain
 
-Files: debian/*, man/mp4fpsmod.1
+Files: debian/* man/mp4fpsmod.1
 Copyright: 2014 djcj <djcj@gmx.de>
 License: MIT
 
@@ -40,6 +41,13 @@ Files: src/getopt.h
 Copyright: 2000 The NetBSD Foundation, Inc.
            nu774 <honeycomb77@gmail.com>
 License: BSD-4-clause
+
+
+License: public-domain
+ These files are given to the public domain.
+ .
+ You can use and modify them freely, also without credit, although the authors
+ would appreciate some.
 
 
 License: MIT
