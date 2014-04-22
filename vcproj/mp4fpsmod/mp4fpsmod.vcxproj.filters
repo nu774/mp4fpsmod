@@ -1,48 +1,48 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="..\..\main.cpp">
+    <ClCompile Include="..\..\src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mp4trackx.cpp">
+    <ClCompile Include="..\..\src\mp4trackx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mp4v2wrapper.cpp">
+    <ClCompile Include="..\..\src\mp4v2wrapper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\strcnv.cpp">
+    <ClCompile Include="..\..\src\strcnv.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\utf8_codecvt_facet.cpp">
+    <ClCompile Include="..\..\src\utf8_codecvt_facet.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\getopt.c">
+    <ClCompile Include="..\..\src\getopt.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\mp4filex.cpp">
+    <ClCompile Include="..\..\src\mp4filex.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\version.cpp">
+    <ClCompile Include="..\..\src\version.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\utf8_codecvt_facet.hpp">
+    <ClInclude Include="..\..\src\utf8_codecvt_facet.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\mp4trackx.h">
+    <ClInclude Include="..\..\src\mp4trackx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\mp4v2wrapper.h">
+    <ClInclude Include="..\..\src\mp4v2wrapper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\strcnv.h">
+    <ClInclude Include="..\..\src\strcnv.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\getopt.h">
+    <ClInclude Include="..\..\src\getopt.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\mp4filex.h">
+    <ClInclude Include="..\..\src\mp4filex.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
