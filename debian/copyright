@@ -4,7 +4,7 @@ Upstream-Contact: nu774 <honeycomb77@gmail.com>
 Source: https://github.com/nu774/mp4fpsmod
 
 
-Files: *
+Files: src/*
 License: public-domain
 
 Files: debian/*, man/mp4fpsmod.1
@@ -24,19 +24,19 @@ Copyright: Edward Groenendaal <egroenen@cisco.com>
            nu774 <honeycomb77@gmail.com>
 License: MPL-1.1
 
-Files: utf8_codecvt_facet.*
+Files: src/utf8_codecvt_facet.*
 Copyright: 2001 Ronald Garcia, Indiana University <garcia@osl.iu.edu>
            2001 Andrew Lumsdaine, Indiana University <lums@osl.iu.edu>
            nu774 <honeycomb77@gmail.com>
 License: Boost Software License 1.0
 
-Files: missings/getopt.c
+Files: src/getopt.c
 Copyright: 2002 Todd C. Miller <Todd.Miller@courtesan.com>
            2000 The NetBSD Foundation, Inc.
            nu774 <honeycomb77@gmail.com>
 License: BSD-4-clause
 
-Files: missings/getopt.h
+Files: src/getopt.h
 Copyright: 2000 The NetBSD Foundation, Inc.
            nu774 <honeycomb77@gmail.com>
 License: BSD-4-clause
