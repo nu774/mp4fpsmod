@@ -4,7 +4,7 @@ Upstream-Contact: nu774 <honeycomb77@gmail.com>
 Source: https://github.com/nu774/mp4fpsmod
 
 
-Files: src/*
+Files: *
 Copyright: public-domain
 License: public-domain
 

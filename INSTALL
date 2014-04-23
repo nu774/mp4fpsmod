@@ -1,0 +1,9 @@
+To compile mp4fpsmod run:
+make configure all strip
+
+To install into standard prefix (/usr/local) run:
+make install
+
+To install somewhere else (i.e. /usr) run:
+make install DESTDIR=/usr
+
