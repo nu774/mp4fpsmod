@@ -6,10 +6,10 @@
 .SH NAME
 mp4fpsmod \- Tiny mp4 time code editor
 .SH SYNOPSIS
-mp4fpsmod [options] FILE
+.B mp4fpsmod\fR [options] FILE
 .SH DESCRIPTION
 .PP
-You can use this for changing fps, delaying audio tracks, executing DTS
+You can use mp4fpsmod for changing fps, delaying audio tracks, executing DTS
 compression, extracting time codes of mp4.
 .PP
 .TP
@@ -141,8 +141,20 @@ mp4fpsmod\ \-d\ \-200\ \-c\ foo.mp4\ \-o\ bar.mp4
 .SS About timecode optimization
 .PP
 Consider timecode file like this:
-.PP
-# timecode format v2 0 33 67 100 133 167 200
+.IP
+.nf
+\f[C]
+# timecode format v2
+0
+33
+67
+100
+133
+167
+200
+:
+\f[]
+.fi
 .PP
 This is the example of timecodes for 30000/1001 fps movie.
 .PD 0
