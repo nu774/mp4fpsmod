@@ -5,8 +5,9 @@
 .TH MP4FPSMOD "1" "March 2014" "0.24" "User Commands"
 .SH NAME
 mp4fpsmod \- Tiny mp4 time code editor
+.SH SYNOPSIS
+mp4fpsmod [options] FILE
 .SH DESCRIPTION
-usage: mp4fpsmod [options] FILE
 .PP
 You can use this for changing fps, delaying audio tracks, executing DTS
 compression, extracting time codes of mp4.
@@ -45,89 +46,6 @@ keep: Keep original timescale.
 n: Set timescale of videotrack to n.
 .PP
 .PP
-.SS Example
-.PP
-Read foo.mp4, change fps to 25, and save to bar.mp4::
-.IP
-.nf
-\f[C]
-mp4fpsmod\ \-r\ 0:25\ \-o\ bar.mp4\ foo.mp4
-\f[]
-.fi
-.PP
-Read foo.mp4, change fps of first 300 frames to 30000/1001, next 600
-frames to 24000/1001, and rest of the movie to 30000/1001 (producing VFR
-movie)::
-.IP
-.nf
-\f[C]
-mp4fpsmod\ \-r\ 300:30000/1001\ \-r\ 600:24000/1001\ \-r\ 0:30000/1001\ \-o\ bar.mp4\ foo.mp4
-\f[]
-.fi
-.PP
-Edit timecodes of foo.mp4 with timecode_v2 described in timecode.txt,
-and save to bar.mp4::
-.IP
-.nf
-\f[C]
-mp4fpsmod\ \-t\ timecode.txt\ foo.mp4\ \-o\ bar.mp4
-\f[]
-.fi
-.PP
-Same as above example, with DTS compression enabled and timecodes
-optimization::
-.IP
-.nf
-\f[C]
-mp4fpsmod\ \-t\ timecode.txt\ \-x\ \-c\ foo.mp4\ \-o\ bar.mp4
-\f[]
-.fi
-.PP
-Read timecodes of foo.mp4 and save to timecode.txt::
-.IP
-.nf
-\f[C]
-mp4fpsmod\ \-p\ timecode.txt\ foo.mp4
-\f[]
-.fi
-.PP
-Execute DTS compression, and save to bar.mp4::
-.IP
-.nf
-\f[C]
-mp4fpsmod\ \-c\ foo.mp4\ \-o\ bar.mp4
-\f[]
-.fi
-.PP
-Delay audio by 100ms using edts/elst::
-.IP
-.nf
-\f[C]
-mp4fpsmod\ \-d\ 100\ foo.mp4\ \-o\ bar.mp4
-\f[]
-.fi
-.PP
-Delay audio by \-200ms using DTS/CTS shifting::
-.IP
-.nf
-\f[C]
-mp4fpsmod\ \-d\ \-200\ \-c\ foo.mp4\ \-o\ bar.mp4
-\f[]
-.fi
-.SS Usage
-.PP
-:: \-o Specify MP4 output filename.
-\-p, \-\-print Output current timecodes into timecode\-v2 format.
-\-t, \-\-tcfile Edit timecodes with timecode\-v2 file.
-\-x, \-\-optimize Optimize timecode \-r, \-\-fps Edit timecodes with the
-spec.
-You can specify \-r more than two times, to produce VFR movie.
-"nframes" is number of frames, which "fps" is aplied to.
-0 as nframes means "rest of the movie" "fps" is a rational or integer.
-For example, 25 or 30000/1001.
-\-c, \-\-compress\-dts Enable DTS compression.
-\-d, \-\-delay Delay audio by n millisecond.
-.PP
 In any cases, the original mp4 is kept as it is (not touched).
 \-o is required except when you specify \-p.
 On the other hand, when you specify \-p, other options are ignored.
@@ -150,11 +68,81 @@ edited, edts/elst of video/audio tracks are deleted, and re\-inserted as
 needed.
 Therefore, if the input has already some audio delays, you have to
 always specify it with \-d.
+.PP
+.SS Examples
+.PP
+Read foo.mp4, change fps to 25, and save to bar.mp4:
+.IP
+.nf
+\f[C]
+mp4fpsmod\ \-r\ 0:25\ \-o\ bar.mp4\ foo.mp4
+\f[]
+.fi
+.PP
+Read foo.mp4, change fps of first 300 frames to 30000/1001, next 600
+frames to 24000/1001, and rest of the movie to 30000/1001 (producing VFR
+movie):
+.IP
+.nf
+\f[C]
+mp4fpsmod\ \-r\ 300:30000/1001\ \-r\ 600:24000/1001\ \-r\ 0:30000/1001\ \-o\ bar.mp4\ foo.mp4
+\f[]
+.fi
+.PP
+Edit timecodes of foo.mp4 with timecode_v2 described in timecode.txt,
+and save to bar.mp4:
+.IP
+.nf
+\f[C]
+mp4fpsmod\ \-t\ timecode.txt\ foo.mp4\ \-o\ bar.mp4
+\f[]
+.fi
+.PP
+Same as above example, with DTS compression enabled and timecodes
+optimization:
+.IP
+.nf
+\f[C]
+mp4fpsmod\ \-t\ timecode.txt\ \-x\ \-c\ foo.mp4\ \-o\ bar.mp4
+\f[]
+.fi
+.PP
+Read timecodes of foo.mp4 and save to timecode.txt:
+.IP
+.nf
+\f[C]
+mp4fpsmod\ \-p\ timecode.txt\ foo.mp4
+\f[]
+.fi
+.PP
+Execute DTS compression, and save to bar.mp4:
+.IP
+.nf
+\f[C]
+mp4fpsmod\ \-c\ foo.mp4\ \-o\ bar.mp4
+\f[]
+.fi
+.PP
+Delay audio by 100ms using edts/elst:
+.IP
+.nf
+\f[C]
+mp4fpsmod\ \-d\ 100\ foo.mp4\ \-o\ bar.mp4
+\f[]
+.fi
+.PP
+Delay audio by \-200ms using DTS/CTS shifting:
+.IP
+.nf
+\f[C]
+mp4fpsmod\ \-d\ \-200\ \-c\ foo.mp4\ \-o\ bar.mp4
+\f[]
+.fi
 .SS About timecode optimization
 .PP
-Consider timecode file like this::
+Consider timecode file like this:
 .PP
-# timecode format v2 0 33 67 100 133 167 200 :
+# timecode format v2 0 33 67 100 133 167 200
 .PP
 This is the example of timecodes for 30000/1001 fps movie.
 .PD 0
@@ -190,7 +178,7 @@ CTS is like DTS, except that it is arranged in the composition order,
 instead of decoding/frame order.
 .PP
 In the mp4 container, stts box(which holds DTS delta) will look like
-this::
+this:
 .IP
 .nf
 \f[C]
@@ -200,7 +188,7 @@ this::
 .fi
 .PP
 Timecodes of this movie will be something like this, if B\-frame is
-used::
+used:
 .IP
 .nf
 \f[C]
@@ -219,7 +207,7 @@ DTS\ \ \ \ \ \ \ \ \ \ CTS
 .PP
 However, this doesn\[aq]t satisfy DTS <= CTS, for some frames.
 Therefore, we have to shift(delay) CTS.
-Finally, we get::
+Finally, we get:
 .IP
 .nf
 \f[C]
@@ -247,7 +235,7 @@ DTS compression comes for this reason.
 If you enable DTS compression with "\-c" option, mp4fpsmod produces
 smaller DTS at beginning, and minimizes the CTS delay without the help
 of edts/elst box.
-With DTS compression, DTS and CTS will be something like this::
+With DTS compression, DTS and CTS will be something like this:
 .IP
 .nf
 \f[C]

@@ -8,10 +8,6 @@ Files: *
 Copyright: public-domain
 License: public-domain
 
-Files: debian/* man/mp4fpsmod.1
-Copyright: 2014 djcj <djcj@gmx.de>
-License: MIT
-
 Files: mp4v2/*
 Copyright: Edward Groenendaal <egroenen@cisco.com>
            Jonathon Rubin <jb.rubin@gmail.com>

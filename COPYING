@@ -15,6 +15,3 @@ These are from FreeBSD CVS repositry
 (http://www.freebsd.org/cgi/cvsweb.cgi/),
 and modified to use wchar_t instead of char.
 
-Files under debian, man/mp4fpsmod.1:
-Copyright: 2014 djcj <djcj@gmx.de>
-License: MIT
