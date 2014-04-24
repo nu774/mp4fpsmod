@@ -24,12 +24,12 @@ CXXFLAGS = -O2 -Wall
 LIBPATH  = -L./mp4v2/.libs
 
 
-all: libmp4v2 mp4fpsmod
-	gzip -fk9 $(man1_MANS)
+all: configure libmp4v2 mp4fpsmod strip
 
 configure:
 	cd mp4v2 && ./make_configure
 	cd mp4v2 && ./configure --enable-shared=no --disable-util
+	gzip -fk9 $(man1_MANS) $(doc_DATA)
 
 libmp4v2:
 	cd mp4v2 && $(MAKE)
@@ -41,14 +41,15 @@ clean:
 	rm -f $(bin_PROGRAM) src/*.o *.gz man/*.gz
 	cd mp4v2 && $(MAKE) clean
 
-distclean: clean
+distclean:
+	rm -f $(bin_PROGRAM) src/*.o *.gz man/*.gz
+	rm mp4v2/libplatform/config.h.in~
 	cd mp4v2 && $(MAKE) distclean
 
 strip:
 	strip $(bin_PROGRAM)
 
 install:
-	gzip -fk9 $(doc_DATA)
 	install -d $(bin_DESTDIR)
 	install -d $(man1_DESTDIR)
 	install -d $(doc_DESTDIR)

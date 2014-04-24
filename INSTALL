@@ -1,9 +1,7 @@
-To compile mp4fpsmod run:
-make configure all strip
+To compile mp4fpsmod run "make".
+To install into standard prefix (/usr/local) run "make install".
+To install somewhere else (i.e. /usr) run "make install DESTDIR=/usr".
 
-To install into standard prefix (/usr/local) run:
-make install
-
-To install somewhere else (i.e. /usr) run:
-make install DESTDIR=/usr
+The make targets can also be called individually. Running "make" or
+"make all" is equivalent to "make configure libmp4v2 mp4fpsmod strip".
 
