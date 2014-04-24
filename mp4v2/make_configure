@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -e
 
 CA=configure.ac
 AM=GNUmakefile.am
@@ -10,4 +10,7 @@ grep platform_win32.cpp $AM > /dev/null 2>&1 || \
 	libplatform/platform_win32.cpp    \\
 ' >$AM) < $AM
 
-exec autoreconf -i
+echo "Running autoreconf..."
+autoreconf -ivf "$@"
+
+echo "Now run ./configure and then make to build MP4v2"
