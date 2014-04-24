@@ -4,6 +4,4 @@
 	dh $@ --parallel
 
 override_dh_auto_build:
-	$(MAKE) configure
 	$(MAKE)
-
