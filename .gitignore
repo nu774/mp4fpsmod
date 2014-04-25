@@ -1,6 +1,14 @@
-mp4v2/GNUmakefile.in
-mp4v2/aclocal.m4
-mp4v2/autoaux/
-mp4v2/autom4te.cache/
-mp4v2/configure
+autoaux/
+autom4te.cache/
+
+aclocal.m4
+config.h.in
+configure
+depcomp
+GNUmakefile.in
+install-sh
+Makefile.in
+missing
+
+*.in~
 
