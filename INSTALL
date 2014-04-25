@@ -1,7 +1,19 @@
-To compile mp4fpsmod run "make".
-To install into standard prefix (/usr/local) run "make install".
-To install somewhere else (i.e. /usr) run "make install DESTDIR=/usr".
+1) Type './bootstrap.sh' to create the files needed to build mp4fpsmod.
 
-The make targets can also be called individually. Running "make" or
-"make all" is equivalent to "make configure libmp4v2 mp4fpsmod strip".
+2) Then type './configure' to create the configuration. A list of
+configure options is printed by running 'configure --help'.
 
+3) Then type 'make' to build mp4fpsmod.
+
+  3.1) It is recommended to type 'strip mp4fpsmod' after the build
+       has finished, to strip unneeded symbols from the binary,
+       which makes it significantly smaller. This step however is
+       not essential and can safely be ignored.
+
+4) Type 'make install' to install the files you built.
+
+
+Summary:
+./bootstrap.sh
+./configure && make && strip mp4fpsmod
+make install

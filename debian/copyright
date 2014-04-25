@@ -5,7 +5,7 @@ Source: https://github.com/nu774/mp4fpsmod
 
 
 Files: *
-Copyright: public-domain
+Copyright: none
 License: public-domain
 
 Files: mp4v2/*
@@ -40,10 +40,15 @@ License: BSD-4-clause
 
 
 License: public-domain
- These files are given to the public domain.
+ THIS SOFTWARE IS NOT COPYRIGHTED
  .
- You can use and modify them freely, also without credit, although the authors
- would appreciate some.
+ This source code is offered for use in the public domain. You may
+ use, modify or distribute it freely.
+ .
+ This code is distributed in the hope that it will be useful but
+ WITHOUT ANY WARRANTY. ALL WARRANTIES, EXPRESS OR IMPLIED ARE HEREBY
+ DISCLAIMED. This includes but is not limited to warranties of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 
 License: MIT
