@@ -65,6 +65,9 @@
     <Lib>
       <OutputFile>$(OutDir)mp4v2.lib</OutputFile>
     </Lib>
+    <PreBuildEvent>
+      <Command>copy ..\..\mp4v2\include\mp4v2\project.h.in ..\..\mp4v2\include\mp4v2\project.h</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -82,6 +85,9 @@
     <Lib>
       <OutputFile>$(OutDir)mp4v2.lib</OutputFile>
     </Lib>
+    <PreBuildEvent>
+      <Command>copy ..\..\mp4v2\include\mp4v2\project.h.in ..\..\mp4v2\include\mp4v2\project.h</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\mp4v2\libplatform\platform_win32.cpp" />
