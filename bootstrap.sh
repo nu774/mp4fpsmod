@@ -1,5 +1,7 @@
 #! /bin/sh -e
 
+mkdir -p "m4"
+
 echo "Running autoreconf..."
 autoreconf -ivf "$@"
 
