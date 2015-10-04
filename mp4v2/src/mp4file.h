@@ -74,14 +74,15 @@ public:
     // file ops
     ///////////////////////////////////////////////////////////////////////////
 
-    void Create( const char* fileName,
-                 uint32_t    flags,
-                 int         add_ftyp = 1,
-                 int         add_iods = 1,
-                 char*       majorBrand = NULL,
-                 uint32_t    minorVersion = 0,
-                 char**      supportedBrands = NULL,
-                 uint32_t    supportedBrandsCount = 0 );
+    void Create( const char*            fileName,
+                 uint32_t               flags,
+                 const MP4FileProvider* provider = NULL,
+                 int                    add_ftyp = 1,
+                 int                    add_iods = 1,
+                 char*                  majorBrand = NULL,
+                 uint32_t               minorVersion = 0,
+                 char**                 supportedBrands = NULL,
+                 uint32_t               supportedBrandsCount = 0 );
 
     const std::string &GetFilename() const;
     void Read( const char* name, const MP4FileProvider* provider );
@@ -91,8 +92,6 @@ public:
     void Dump( bool dumpImplicits = false );
     void Close(uint32_t flags = 0);
 
-    bool Use64Bits(const char *atomName);
-    void Check64BitStatus(const char *atomName);
     /* file properties */
 
     uint64_t GetIntegerProperty(const char* name);

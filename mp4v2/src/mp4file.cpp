@@ -97,17 +97,18 @@ void MP4File::Read( const char* name, const MP4FileProvider* provider )
     CacheProperties();
 }
 
-void MP4File::Create( const char* fileName,
-                      uint32_t    flags,
-                      int         add_ftyp,
-                      int         add_iods,
-                      char*       majorBrand,
-                      uint32_t    minorVersion,
-                      char**      supportedBrands,
-                      uint32_t    supportedBrandsCount )
+void MP4File::Create( const char*            fileName,
+                      uint32_t               flags,
+                      const MP4FileProvider* provider,
+                      int                    add_ftyp,
+                      int                    add_iods,
+                      char*                  majorBrand,
+                      uint32_t               minorVersion,
+                      char**                 supportedBrands,
+                      uint32_t               supportedBrandsCount )
 {
     m_createFlags = flags;
-    Open( fileName, File::MODE_CREATE, NULL );
+    Open( fileName, File::MODE_CREATE, provider );
 
     // generate a skeletal atom tree
     m_pRootAtom = MP4Atom::CreateAtom(*this, NULL, NULL);
@@ -130,34 +131,6 @@ void MP4File::Create( const char* fileName,
         (void)AddChildAtom("moov", "iods");
     }
 }
-
-bool MP4File::Use64Bits (const char *atomName)
-{
-    uint32_t atomid = ATOMID(atomName);
-    if (atomid == ATOMID("mdat") || atomid == ATOMID("stbl")) {
-        return (m_createFlags & MP4_CREATE_64BIT_DATA) == MP4_CREATE_64BIT_DATA;
-    }
-    if (atomid == ATOMID("mvhd") ||
-            atomid == ATOMID("tkhd") ||
-            atomid == ATOMID("mdhd")) {
-        return (m_createFlags & MP4_CREATE_64BIT_TIME) == MP4_CREATE_64BIT_TIME;
-    }
-    return false;
-}
-
-void MP4File::Check64BitStatus (const char *atomName)
-{
-    uint32_t atomid = ATOMID(atomName);
-
-    if (atomid == ATOMID("mdat") || atomid == ATOMID("stbl")) {
-        m_createFlags |= MP4_CREATE_64BIT_DATA;
-    } else if (atomid == ATOMID("mvhd") ||
-               atomid == ATOMID("tkhd") ||
-               atomid == ATOMID("mdhd")) {
-        m_createFlags |= MP4_CREATE_64BIT_TIME;
-    }
-}
-
 
 bool MP4File::Modify( const char* fileName )
 {
@@ -246,7 +219,7 @@ bool MP4File::Modify( const char* fileName )
     MP4Atom* pMdatAtom = InsertChildAtom(m_pRootAtom, "mdat", numAtoms - 1);
 
     // start writing new mdat
-    pMdatAtom->BeginWrite(Use64Bits("mdat"));
+    pMdatAtom->BeginWrite();
     return true;
 }
 
@@ -752,6 +725,7 @@ void MP4File::FindIntegerProperty(const char* name,
     case Integer24Property:
     case Integer32Property:
     case Integer64Property:
+    case Integer6432Property:
         break;
     default:
         ostringstream msg;
