@@ -142,10 +142,10 @@ void averageTimecode(Option &opt)
         opt.averages.push_back(std::make_pair(kk->size(), average));
     }
     std::fprintf(stderr, "Divided into %d group%s\n",
-            groups.size(), (groups.size() == 1) ? "" : "s");
+            int(groups.size()), (groups.size() == 1) ? "" : "s");
     for (size_t i = 0; i < opt.averages.size(); ++i) {
         std::fprintf(stderr, "%d frames: time delta %g\n",
-                opt.averages[i].first, opt.averages[i].second);
+                int(opt.averages[i].first), opt.averages[i].second);
     }
 
     tc.clear();
