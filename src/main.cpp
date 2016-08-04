@@ -19,6 +19,7 @@
 
 struct Option {
     const char *src, *dst, *timecodeFile;
+    bool inplace;
     bool compressDTS;
     bool optimizeTimecode;
     bool printOnly;
@@ -35,6 +36,7 @@ struct Option {
         src = 0;
         dst = 0;
         timecodeFile = 0;
+        inplace = false;
         compressDTS = false;
         optimizeTimecode = false;
         printOnly = false;
@@ -282,7 +284,10 @@ void execute(Option &opt)
         mp4v2::impl::log.setVerbosity(MP4_LOG_NONE);
         mp4v2::impl::MP4File file;
         std::fprintf(stderr, "Reading MP4 stream...\n");
-        file.Read(opt.src, 0);
+        if (opt.inplace)
+            file.Modify(opt.src);
+        else
+            file.Read(opt.src, 0);
         std::fprintf(stderr, "Done reading\n");
         MP4TrackId trackId = file.FindTrackId(0, MP4_VIDEO_TRACK_TYPE);
         mp4v2::impl::MP4Track *track = file.GetTrack(trackId);
@@ -324,13 +329,17 @@ void execute(Option &opt)
             editor.AdjustTimeCodes();
             editor.DoEditTimeCodes();
         }
-        std::fprintf(stderr, "Saving MP4 stream...\n");
-        MP4FileCopy copier(&file);
-        copier.start(opt.dst);
-        uint64_t count = copier.getTotalChunks();
-        for (uint64_t i = 1; copier.copyNextChunk(); ++i) {
-            std::fprintf(stderr, "\rWriting chunk %" PRId64 "/%" PRId64 "...",
-                    i, count);
+        if (opt.inplace)
+            file.Close();
+        else {
+            std::fprintf(stderr, "Saving MP4 stream...\n");
+            MP4FileCopy copier(&file);
+            copier.start(opt.dst);
+            uint64_t count = copier.getTotalChunks();
+            for (uint64_t i = 1; copier.copyNextChunk(); ++i) {
+                std::fprintf(stderr, "\rWriting chunk %" PRId64 "/%" PRId64 "...",
+                        i, count);
+            }
         }
         std::fprintf(stderr, "\nOperation completed with no problem\n");
     } catch (mp4v2::impl::Exception *e) {
@@ -347,6 +356,7 @@ void usage()
 "(libmp4v2 " MP4V2_PROJECT_version ")\n"
 "usage: mp4fpsmod [options] FILE\n"
 "  -o <file>             Specify MP4 output filename.\n"
+"  -i, --inplace         Edit in-place instead of creating a new file.\n"
 "  -p, --print <file>    Output current timecodes into timecode-v2 format.\n"
 "  -t, --tcfile <file>   Edit timecodes with timecode-v2 file.\n"
 "  -x, --optimize        Optimize timecode\n"
@@ -369,6 +379,7 @@ void usage()
 }
 
 static struct option long_options[] = {
+    { "inplace", no_argument, 0, 'i' },
     { "print", required_argument, 0, 'p' },
     { "fps", required_argument, 0, 'r' },
     { "tcfile", required_argument, 0, 't' },
@@ -388,9 +399,11 @@ int main1(int argc, char **argv)
         Option option;
         int ch;
 
-        while ((ch = getopt_long(argc, argv, "o:p:r:t:d:T:xcQ",
+        while ((ch = getopt_long(argc, argv, "io:p:r:t:d:T:xcQ",
                         long_options, 0)) != EOF) {
-            if (ch == 'r') {
+            if (ch == 'i') {
+                option.inplace = true;
+            } else if (ch == 'r') {
                 int nframes, num, denom = 1;
                 if (std::sscanf(optarg, "%d:%d/%d", &nframes, &num, &denom) < 2)
                     usage();
@@ -425,7 +438,7 @@ int main1(int argc, char **argv)
         }
         argc -= optind;
         argv += optind;
-        if (argc == 0 || (!option.printOnly && option.dst == 0))
+        if (argc == 0 || (!option.printOnly && !option.inplace && !option.dst))
             usage();
         if (!option.printOnly && option.timecodeFile && option.ranges.size()) {
             fprintf(stderr, "-t and -r are exclusive\n");
