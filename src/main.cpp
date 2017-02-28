@@ -395,7 +395,7 @@ int main1(int argc, char **argv)
                 int nframes, num, denom = 1;
                 if (std::sscanf(optarg, "%d:%d/%d", &nframes, &num, &denom) < 2)
                     usage();
-                FPSRange range = { nframes, num, denom };
+                FPSRange range = { (uint32_t)nframes, num, denom };
                 option.ranges.push_back(range);
             } else if (ch == 'p') {
                 option.printOnly = true;
