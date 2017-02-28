@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <numeric>
+#include <algorithm>
 #if defined(_WIN32)
 #include <windows.h>
 #include "utf8_codecvt_facet.hpp"
