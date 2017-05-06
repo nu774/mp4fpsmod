@@ -19,5 +19,6 @@ AM_CPPFLAGS = \
     -I $(top_srcdir)/mp4v2         \
     -I $(top_builddir)/mp4v2       \
     -I $(top_srcdir)/mp4v2/include \
+    -I $(top_builddir)/mp4v2/include \
     -I $(top_srcdir)/mp4v2/src
 mp4fpsmod_LDADD = -l mp4v2 -L mp4v2/.libs

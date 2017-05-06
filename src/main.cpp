@@ -16,7 +16,7 @@
 #endif
 #include "mp4filex.h"
 #include "mp4trackx.h"
-#include "../mp4v2/include/mp4v2/project.h"
+#include "mp4v2/project.h"
 
 struct Option {
     const char *src, *dst, *timecodeFile;
