@@ -354,7 +354,7 @@ void TrackEditor::UpdateStts()
     std::vector<SampleTime>::iterator is;
     for (is = ++m_sampleTimes.begin(); is != m_sampleTimes.end(); ++is) {
         int32_t delta = static_cast<int32_t>(is->dts - prev_dts);
-        if (delta != prev_delta) {
+        if (delta > prev_delta) {
             ++sttsIndex;
             m_track->SttsCountProperty()->IncrementValue();
             m_track->SttsSampleCountProperty()->AddValue(0);
