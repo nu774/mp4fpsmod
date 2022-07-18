@@ -28,6 +28,7 @@ struct Option {
     uint32_t timeScale;
     int requestedTimeScale;
     int audioDelay;
+    int audioTimeDelta;
     std::vector<FPSRange> ranges;
     std::vector<double> timecodes;
     std::vector<std::pair<size_t, double> > averages;
@@ -44,10 +45,11 @@ struct Option {
         requestedTimeScale = 0;
         timeScale = 1000;
         audioDelay = 0;
+        audioTimeDelta = 0;
     }
     bool modified() {
         return compressDTS || audioDelay || ranges.size()
-            || timecodes.size() || optimizeTimecode || requestedTimeScale > 0;
+            || timecodes.size() || optimizeTimecode || requestedTimeScale > 0 || audioTimeDelta > 0;
     }
 };
 
@@ -278,6 +280,60 @@ void printTimeCodes(const Option &opt, TrackEditor &track)
     std::fclose(fp);
 }
 
+std::list<double> fixAudioTimeCodes(Option& opt, mp4v2::impl::MP4File &file, TrackEditor &vtrackeditor)
+{
+    MP4TrackId atrackId = file.FindTrackId(0, MP4_AUDIO_TRACK_TYPE);
+    MP4TrackX* atrack = reinterpret_cast<MP4TrackX*>(file.GetTrack(atrackId));
+    double timescale = atrack->GetTimeScale();
+    TrackEditor aeditor(reinterpret_cast<MP4TrackX*>(atrack));
+    size_t cnt = aeditor.GetFrameCount();
+    std::list<double> vctsList, fixedVctsList;
+    for (size_t i = 0; i < vtrackeditor.GetFrameCount() + 1; ++i)
+        vctsList.push_back(vtrackeditor.CTS(i));
+
+    int64_t dts_diff = 0;
+    const double alpha = 0.2;
+    double timeDelta = 0;
+    for (size_t i = 1; i <= cnt; ++i) {
+        double dts = aeditor.DTS(i);
+        double fixed = opt.audioTimeDelta * i;
+        while (vctsList.size()) {
+            double vcts = vctsList.front();
+            if (vcts * aeditor.GetTimeScale() / vtrackeditor.GetTimeScale() > dts) break;
+            double newvcts = vcts * fixed / dts;
+            if (!fixedVctsList.size()) {
+                fixedVctsList.push_back(newvcts);
+            } else if (timeDelta == 0) {
+                timeDelta = newvcts - fixedVctsList.back();
+                fixedVctsList.push_back(newvcts);
+            } else  {
+                double lastCts = fixedVctsList.back();
+                timeDelta = alpha * (newvcts - lastCts) + (1.0 - alpha) * timeDelta;
+                fixedVctsList.push_back(lastCts + timeDelta);
+            }
+            dts_diff = newvcts - vcts;
+            vctsList.pop_front();
+        }
+    }
+    while (vctsList.size()) {
+        double vcts = vctsList.front();
+        fixedVctsList.push_back(vcts + dts_diff);
+        vctsList.pop_front();
+    }
+
+    int nstts = atrack->SttsCountProperty()->GetValue();
+    atrack->SttsCountProperty()->IncrementValue(-1 * nstts);
+    atrack->SttsSampleCountProperty()->SetCount(0);
+    atrack->SttsSampleDeltaProperty()->SetCount(0);
+    atrack->SttsCountProperty()->IncrementValue();
+    atrack->SttsSampleCountProperty()->AddValue(cnt);
+    atrack->SttsSampleDeltaProperty()->AddValue(opt.audioTimeDelta);
+    atrack->MediaDurationProperty()->SetValue(0);
+    atrack->UpdateDurationsX(cnt * opt.audioTimeDelta);
+
+    return fixedVctsList;
+}
+
 void execute(Option &opt)
 {
     try {
@@ -308,6 +364,15 @@ void execute(Option &opt)
         else if (opt.timecodeFile || opt.modified()) {
             if (opt.timecodeFile)
                 loadTimecodeV2(opt, editor.GetFrameCount() + 1);
+            else if (opt.audioTimeDelta > 0) {
+                std::list<double> vctsList = fixAudioTimeCodes(opt, file, editor);
+                opt.timeScale = opt.originalTimeScale;
+                for (auto it = vctsList.begin(); it != vctsList.end(); ++it) {
+                    opt.timecodes.push_back(*it);
+                }
+                if (opt.optimizeTimecode)
+                    averageTimecode(opt);
+            }
             else {
                 uint64_t off = editor.CTS(0);
                 opt.timeScale = opt.originalTimeScale;
@@ -375,6 +440,9 @@ void usage()
 "  -T, --timescale <keep|n>\n"
 "                        keep: Keep original timescale.\n"
 "                        n: Set timescale of videotrack to n.\n"
+"  -A, --static-audio-timedelta <n>\n"
+"                        Make timedelta of audio track static.\n"
+"                        Also modify video timestamps to keep them in sync\n"
     , getversion());
     std::exit(1);
 }
@@ -400,7 +468,7 @@ int main1(int argc, char **argv)
         Option option;
         int ch;
 
-        while ((ch = getopt_long(argc, argv, "io:p:r:t:d:T:xcQ",
+        while ((ch = getopt_long(argc, argv, "io:p:r:t:d:T:A:xcQ",
                         long_options, 0)) != EOF) {
             if (ch == 'i') {
                 option.inplace = true;
@@ -435,6 +503,11 @@ int main1(int argc, char **argv)
                         usage();
                     option.requestedTimeScale = n;
                 }
+            } else if (ch == 'A') {
+                int delta;
+                if (std::sscanf(optarg, "%d", &delta) != 1)
+                    usage();
+                option.audioTimeDelta = delta;
             }
         }
         argc -= optind;
