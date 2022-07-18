@@ -1,4 +1,4 @@
 const char *getversion()
 {
-    return "0.26";
+    return "0.27";
 }
