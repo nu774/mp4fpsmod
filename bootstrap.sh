@@ -1,9 +1,8 @@
 #! /bin/sh -e
 
-mkdir -p "m4"
-
 echo "Running autoreconf..."
 autoreconf -ivf "$@"
+cd mp4v2; autoreconf -ivf "$@"; cd ..
 
 echo "Now run './configure' and then 'make' to build mp4fpsmod"
 

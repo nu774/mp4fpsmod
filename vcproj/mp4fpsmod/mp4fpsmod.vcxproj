@@ -50,7 +50,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;MP4V2_USE_STATIC_LIB;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\mp4v2;..\..\mp4v2\include;..\..\mp4v2\src</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\mp4v2;..\..\mp4v2\include;..\..\mp4v2\src;..\mp4v2\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

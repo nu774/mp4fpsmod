@@ -342,9 +342,9 @@ void execute(Option &opt)
         mp4v2::impl::MP4File file;
         std::fprintf(stderr, "Reading MP4 stream...\n");
         if (opt.inplace)
-            file.Modify(opt.src);
+            file.Modify(opt.src, 0, 0);
         else
-            file.Read(opt.src, 0);
+            file.Read(opt.src, 0, 0, 0);
         std::fprintf(stderr, "Done reading\n");
         MP4TrackId trackId = file.FindTrackId(0, MP4_VIDEO_TRACK_TYPE);
         mp4v2::impl::MP4Track *track = file.GetTrack(trackId);

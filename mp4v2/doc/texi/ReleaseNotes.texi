@@ -1,0 +1,41 @@
+\input texinfo @c -*- Texinfo -*-
+@c %**start of header
+@setfilename ReleaseNotes.info
+@include base/article.texi
+@paragraphindent none
+@c %**end of header
+
+@titlepage
+@end titlepage
+
+@majorheading @value{PROJECT.name.formal} Release Notes
+@include releasenotes/intro.stable.texi
+@contents
+
+@chapter What's New?
+Version 2.1.2 fixes build system issues, mainly in the CMake build system support. This release also fixes a file seeking
+issue observed on Windows when compiled with _WIN32_WINNT < 0x600 and linked against modern CRT DLLs. In addition, two minor
+issues related to data handling are fixed.
+
+Version 2.1.1 fixes a type mismatch preventing MP4v2 from compiling on 32 bit systems.
+
+Version 2.1 updates the existing build systems and adds support for building with CMake and Xcode. It also fixes compilation
+with newer compilers and integrates smaller improvements and bug fixes from various MP4v2 forks.
+
+@appendix Changelog
+@appendixsection Version 2.1
+@include changelog/version-2.1.texi
+
+@appendixsection Version 2.0
+@include changelog/version-2.0.texi
+
+@appendixsection Version 1.9
+@include changelog/version-1.9.texi
+
+@appendixsection Version 1.6
+@include changelog/version-1.6.texi
+
+@appendix SCM repository details
+@example
+url:  @value{PROJECT.repo.url}
+@end example
