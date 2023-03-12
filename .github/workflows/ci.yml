@@ -1,0 +1,53 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+      - name: Build
+        run: |
+          ./bootstrap.sh
+          ./configure
+          make
+
+  mingw-cross:
+    strategy:
+      matrix:
+        arch: [i686, x86_64]
+        include:
+          - arch: i686
+            os: mingw32
+          - arch: x86_64
+            os: mingw64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install cross compiler
+        run: |
+          ARCH=${{ matrix.arch }}
+          sudo apt-get install g++-mingw-w64-${ARCH//_/-}
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Build
+        run: |
+          ./bootstrap.sh
+          ./configure --host=${{ matrix.arch }}-w64-mingw32 --prefix=/usr/${{ matrix.arch }}-w64-mingw32
+          make
+
+  windows-msvc:
+    strategy:
+      matrix:
+        platform: [Win32, x64]
+    runs-on: windows-latest
+    env:
+      ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v1.3.1
+      - name: Build
+        run: |
+          MSBuild.exe vcproj/mp4fpsmod.sln /p:Configuration=Release /p:Platform=${{ matrix.platform }}
