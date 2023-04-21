@@ -50,4 +50,4 @@ jobs:
         uses: microsoft/setup-msbuild@v1.3.1
       - name: Build
         run: |
-          MSBuild.exe vcproj/mp4fpsmod.sln /p:Configuration=Release /p:Platform=${{ matrix.platform }}
+          MSBuild.exe vcproj/mp4fpsmod.sln /m /p:Configuration=Release /p:Platform=${{ matrix.platform }}
