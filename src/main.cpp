@@ -79,7 +79,7 @@ bool convertToExactRanges(Option &opt)
             /* test if it's close enough to one of the well known rate. */
             double diff = std::abs(delta - sp->delta);
             if (diff < bound) {
-                FPSRange range = { dp->first, sp->num, sp->denom };
+                FPSRange range = { static_cast<uint32_t>(dp->first), sp->num, sp->denom };
                 ranges.push_back(range);
                 break;
             }
