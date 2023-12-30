@@ -1,5 +1,7 @@
 lib_LTLIBRARIES = libmp4v2.la
+if ADD_UTIL
 noinst_LTLIBRARIES = libutil.la
+endif
 
 bin_PROGRAMS =
 
