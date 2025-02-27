@@ -680,6 +680,7 @@ class MP4ColrAtom : public MP4Atom {
 public:
     MP4ColrAtom(MP4File &file);
     void Generate();
+    void Read();
 private:
     MP4ColrAtom();
     MP4ColrAtom( const MP4ColrAtom &src );

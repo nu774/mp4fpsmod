@@ -49,6 +49,18 @@ void MP4ColrAtom::Generate()
     ((MP4Integer16Property*)m_pProperties[3])->SetValue(1);
 }
 
+void MP4ColrAtom::Read()
+{
+    // read colorParameterType, primariesIndex, transferFunctionIndex, matrixIndex
+    ReadProperties(0, 4);
+    if (std::memcmp(dynamic_cast<MP4StringProperty*>(m_pProperties[0])->GetValue(), "nclx", 4) == 0) {
+        AddProperty( /* 4 */ new MP4Integer8Property(*this, "fullRangeFlagAndReserved"));
+        ReadProperties(4);
+    }
+    Skip(); // to end of atom
+}
+
+
 ///////////////////////////////////////////////////////////////////////////////
 
 }
